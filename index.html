@@ -64,7 +64,7 @@
     const points=[[-20,0,-125],[105,7,-100],[205,18,-25],[220,7,100],[145,3,205],[10,14,235],[-125,25,190],[-215,8,90],[-225,0,-45],[-160,12,-160],[-65,22,-220],[45,11,-215],[125,2,-175]].map(p=>new THREE.Vector3(...p));
     const curve=new THREE.CatmullRomCurve3(points,true,'centripetal',.45), TRACK_W=15, trackLength=curve.getLength();
     const up=new THREE.Vector3(0,1,0), vA=new THREE.Vector3(),vB=new THREE.Vector3(),vC=new THREE.Vector3();
-    function frame(u){const p=curve.getPointAt((u%1+1)%1),t=curve.getTangentAt((u%1+1)%1).normalize(),side=new THREE.Vector3().crossVectors(up,t).normalize();return{p,t,side}}
+    function frame(u){const p=curve.getPointAt((u%1+1)%1),t=curve.getTangentAt((u%1+1)%1).normalize(),side=new THREE.Vector3().crossVectors(t,up).normalize();return{p,t,side}}
     function ribbon(width,yOffset,material,segments=720){const pos=[],uv=[],idx=[];for(let i=0;i<=segments;i++){const u=i/segments,{p,side}=frame(u);for(const x of [-1,1]){vA.copy(p).addScaledVector(side,width*x).y+=yOffset;pos.push(vA.x,vA.y,vA.z);uv.push((x+1)/2,u*65)}}for(let i=0;i<segments;i++){const a=i*2;idx.push(a,a+2,a+1,a+1,a+2,a+3)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();const m=new THREE.Mesh(g,material);m.receiveShadow=true;scene.add(m);return m}
     const ground=new THREE.Mesh(new THREE.CircleGeometry(720,96),new THREE.MeshStandardMaterial({color:0x3f7b31,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-4.5;ground.receiveShadow=true;scene.add(ground);
     ribbon(TRACK_W+3,-.18,new THREE.MeshStandardMaterial({color:0xd7dde0,roughness:.88}));ribbon(TRACK_W,0,new THREE.MeshStandardMaterial({color:0x252a31,roughness:.77,metalness:.08}));
@@ -81,19 +81,25 @@
     const load=b64=>new Promise((res,rej)=>loader.load(dataUrl(b64),g=>res(g.scene),undefined,rej));
     const [carAsset,treeAsset,rockAsset,bushAsset]=await Promise.all(Object.values(ASSETS).map(load));
     const prep=obj=>obj.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});[carAsset,treeAsset,rockAsset,bushAsset].forEach(prep);
+    const CAR_SCALE=1.58,carGroundLift=-new THREE.Box3().setFromObject(carAsset).min.y*CAR_SCALE+0.02;
     function cloneTint(asset,color){const o=asset.clone(true);o.traverse(x=>{if(x.isMesh){x.material=x.material.clone();if(color&&/body|paint|primary/i.test(x.name+' '+(x.material.name||''))){x.material.color.set(color);x.material.metalness=.35;x.material.roughness=.28}}});return o}
     const scenery=new THREE.Group();scene.add(scenery);const decor=[treeAsset,bushAsset,rockAsset];
     for(let i=0;i<185;i++){const u=i/185+.002*Math.sin(i*19),{p,side}=frame(u),edge=i%2?1:-1,dist=TRACK_W+7+(i*13%38);const type=(i%11===0)?2:(i%4===0?1:0),o=cloneTint(decor[type]);o.position.copy(p).addScaledVector(side,edge*dist);o.position.y-=type===0?.1:0;o.rotation.y=(i*2.47)%6.28;const s=type===0?1.9+(i%7)*.13:type===1?1.5+(i%4)*.15:1.3+(i%5)*.18;o.scale.setScalar(s);scenery.add(o)}
     const mountainMat=new THREE.MeshStandardMaterial({color:0x41634b,roughness:1,flatShading:true});for(let i=0;i<18;i++){const h=55+(i*31)%85,r=55+(i*17)%58,m=new THREE.Mesh(new THREE.ConeGeometry(r,h,7),mountainMat);const a=i/18*Math.PI*2;m.position.set(Math.cos(a)*460,h/2-5,Math.sin(a)*460);m.rotation.y=i;m.receiveShadow=true;scene.add(m)}
 
     const cars=[], colors=[0xffc400,0xe73635,0x178cff,0x15cc87,0xa754ee,0xff6b1b,0xf1f1f1,0x222a38,0xff4fb7,0x4bdbe8,0xb4db38,0x9f694c];
-    function makeCar(i){const root=new THREE.Group(),model=cloneTint(carAsset,colors[i]);model.scale.setScalar(1.58);root.add(model);scene.add(root);const wheels=[];model.traverse(n=>{if(/wheel/i.test(n.name))wheels.push(n)});const c={root,model,wheels,u:.006-i*.0052,lane:i?((i%3)-1)*4.1:0,speed:0,latVel:0,steer:0,progress:0,lap:1,ai:i>0,base:47+i%4*2.3,seed:i*7.31};cars.push(c);return c}
+    function makeCar(i){const root=new THREE.Group(),model=cloneTint(carAsset,colors[i]);model.scale.setScalar(CAR_SCALE);root.add(model);scene.add(root);const wheels=[];model.traverse(n=>{if(/wheel/i.test(n.name))wheels.push(n)});const c={root,model,wheels,u:.006-i*.0052,lane:i?((i%3)-1)*4.1:0,speed:0,latVel:0,steer:0,progress:0,lap:1,ai:i>0,base:47+i%4*2.3,seed:i*7.31};cars.push(c);return c}
     for(let i=0;i<12;i++)makeCar(i);const player=cars[0];
-    function placeCar(c,dt=0){const f=frame(c.u),yaw=Math.atan2(f.t.x,f.t.z),slip=THREE.MathUtils.clamp(-c.latVel*.018,-.27,.27);c.root.position.copy(f.p).addScaledVector(f.side,c.lane);c.root.position.y+=.56;c.root.rotation.order='YXZ';c.root.rotation.y=yaw+slip;c.root.rotation.z=-c.steer*.085-c.latVel*.012;c.root.rotation.x=THREE.MathUtils.lerp(c.root.rotation.x,(input.gas?-.018:input.brake?.028:0),.08);for(const w of c.wheels){w.rotation.x-=c.speed*dt/0.47;if(/front/i.test(w.name))w.rotation.y=c.steer*.52}}
+    function placeCar(c,dt=0){const f=frame(c.u),yaw=Math.atan2(f.t.x,f.t.z),slip=THREE.MathUtils.clamp(-c.latVel*.018,-.27,.27);c.root.position.copy(f.p).addScaledVector(f.side,c.lane);c.root.position.y+=carGroundLift;c.root.rotation.order='YXZ';c.root.rotation.y=yaw+slip;c.root.rotation.z=-c.steer*.085-c.latVel*.012;c.root.rotation.x=THREE.MathUtils.lerp(c.root.rotation.x,(input.gas?-.018:input.brake?.028:0),.08);for(const w of c.wheels){w.rotation.x-=c.speed*dt/0.47;if(/front/i.test(w.name))w.rotation.y=c.steer*.52}}
 
-    const smokeGeo=new THREE.SphereGeometry(.42,8,6),smokeMat=new THREE.MeshLambertMaterial({color:0xd9e2e3,transparent:true,opacity:.42,depthWrite:false});const smokes=[];
-    function puff(pos,scale=1){let s=smokes.find(x=>!x.visible);if(!s){s=new THREE.Mesh(smokeGeo,smokeMat.clone());scene.add(s);smokes.push(s)}s.visible=true;s.position.copy(pos);s.position.y+=.25;s.scale.setScalar(scale);s.userData.life=1;s.material.opacity=.46}
-    function updateSmoke(dt){for(const s of smokes)if(s.visible){s.userData.life-=dt*.72;s.position.y+=dt*1.05;s.scale.addScalar(dt*1.45);s.material.opacity=Math.max(0,s.userData.life*.4);if(s.userData.life<=0)s.visible=false}}
+    const smokeCanvas=document.createElement('canvas');smokeCanvas.width=smokeCanvas.height=64;
+    const smokeCtx=smokeCanvas.getContext('2d'),smokeGrad=smokeCtx.createRadialGradient(32,32,0,32,32,32);
+    smokeGrad.addColorStop(0,'rgba(255,255,255,.85)');smokeGrad.addColorStop(.4,'rgba(235,238,240,.5)');smokeGrad.addColorStop(1,'rgba(235,238,240,0)');
+    smokeCtx.fillStyle=smokeGrad;smokeCtx.fillRect(0,0,64,64);
+    const smokeTex=new THREE.CanvasTexture(smokeCanvas);
+    const smokeMat=new THREE.SpriteMaterial({map:smokeTex,transparent:true,opacity:.42,depthWrite:false});const smokes=[];
+    function puff(pos,scale=1){let s=smokes.find(x=>!x.visible);if(!s){s=new THREE.Sprite(smokeMat.clone());scene.add(s);smokes.push(s)}s.visible=true;s.position.copy(pos);s.position.y+=.25;s.userData.rot=(Math.random()-.5)*1.4;s.material.rotation=s.userData.rot;s.scale.setScalar(scale*1.3);s.userData.life=1;s.material.opacity=.5}
+    function updateSmoke(dt){for(const s of smokes)if(s.visible){s.userData.life-=dt*.72;s.position.y+=dt*.9;s.userData.rot+=dt*.6;s.material.rotation=s.userData.rot;s.scale.addScalar(dt*1.7);s.material.opacity=Math.max(0,s.userData.life*.45);if(s.userData.life<=0)s.visible=false}}
 
     const input={left:false,right:false,gas:false,brake:false,drift:false,nitro:false};const keyMap={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'gas',KeyW:'gas',ArrowDown:'brake',KeyS:'brake',Space:'drift',ShiftLeft:'nitro',ShiftRight:'nitro'};
     cars.forEach(c=>placeCar(c));
