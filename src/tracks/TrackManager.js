@@ -273,4 +273,28 @@ export default class TrackManager {
         const heading = Math.atan2(tangent.x, tangent.z);
         return { position: p, heading };
     }
+
+    // Arc-length indexing for AI lookahead queries (racing line following, curvature
+    // estimation ahead of the car). `arcLengths` is sorted/monotonic so binary search works.
+    getIndexForArcLength(arcLength) {
+        const n = this.arcLengths.length;
+        const wrapped = ((arcLength % this.totalLength) + this.totalLength) % this.totalLength;
+        let lo = 0, hi = n - 1;
+        while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (this.arcLengths[mid] <= wrapped) lo = mid; else hi = mid - 1;
+        }
+        return lo;
+    }
+
+    getPointAtArcLength(arcLength, lateralOffset = 0) {
+        const idx = this.getIndexForArcLength(arcLength);
+        return this.samples[idx].clone().addScaledVector(this.normals[idx], lateralOffset);
+    }
+
+    getTangentAngleAtArcLength(arcLength) {
+        const idx = this.getIndexForArcLength(arcLength);
+        const t = this.tangents[idx];
+        return Math.atan2(t.x, t.z);
+    }
 }

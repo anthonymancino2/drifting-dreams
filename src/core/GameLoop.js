@@ -12,7 +12,7 @@ export default class GameLoop {
         this.accumulator = 0;
         this.lastTime = 0;
         this.running = false;
-        this.paused = false;
+        this.paused = document.hidden;
         this.frameTimeMs = 0;
         this.fps = 0;
         this._fpsSmoothing = 0;

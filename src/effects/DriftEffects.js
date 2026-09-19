@@ -23,7 +23,9 @@ export default class DriftEffects {
         this._smokeAccumulator = new Map();
     }
 
-    update(racer, dt, camera) {
+    // Per-racer spawn logic only - does NOT advance the shared pools. Call once for
+    // every racer each frame, then call render() exactly once to advance/draw them.
+    spawnForRacer(racer, dt) {
         const state = racer.state;
         if (state.drift.active && Math.abs(state.speed) > 3) {
             const rearOffset = new THREE.Vector3(Math.sin(state.heading + Math.PI), 0, Math.cos(state.heading + Math.PI)).multiplyScalar(1.6);
@@ -46,7 +48,11 @@ export default class DriftEffects {
         }
         racer._prevDriftActive = state.drift.active;
         racer._prevChargeLevel = state.drift.chargeLevel;
+    }
 
+    // Advances and draws both pools. Call exactly once per rendered frame, after
+    // spawnForRacer() has run for every racer.
+    render(dt, camera) {
         this.smokePool.update(dt, camera);
         this.sparkPool.update(dt, camera);
     }

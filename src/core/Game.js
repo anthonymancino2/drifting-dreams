@@ -12,6 +12,10 @@ import CameraManager from '../camera/CameraManager.js';
 import HUD from '../ui/HUD.js';
 import DriftEffects from '../effects/DriftEffects.js';
 import AudioManager from '../audio/AudioManager.js';
+import AIManager from '../ai/AIManager.js';
+import PositionManager from '../race/PositionManager.js';
+
+const AI_RACER_COUNT = 11; // player + 11 AI = 12 racers, the design brief's race cap
 
 const COUNTDOWN_STEPS = ['3', '2', '1', 'GO!'];
 const COUNTDOWN_STEP_TIME = 0.85;
@@ -61,6 +65,17 @@ export default class Game {
             totalLaps: this.totalLaps
         });
         this.player.setNightLights(this.environment.mode === 'night');
+
+        this.aiManager = new AIManager({
+            scene: this.scene,
+            trackManager: this.trackManager,
+            count: AI_RACER_COUNT,
+            totalLaps: this.totalLaps,
+            startGridIndex: 1
+        });
+        this.aiManager.setNightLights(this.environment.mode === 'night');
+        this.positionManager = new PositionManager(this.trackManager);
+        this.allRacers = [this.player, ...this.aiManager.getRacers()];
 
         this.raceTime = 0;
         this.raceStarted = false;
@@ -137,6 +152,7 @@ export default class Game {
             this.settings.set('dayNightMode', mode);
             this.hud.setDayNightIcon(mode);
             this.player.setNightLights(mode === 'night');
+            this.aiManager.setNightLights(mode === 'night');
         };
         this.hud.dayNightToggleEl.addEventListener('click', toggleDayNight);
         this.hud.setDayNightIcon(this.environment.mode);
@@ -168,6 +184,8 @@ export default class Game {
         if (this.inputManager.wasPressed('changeCamera')) this.cameraManager.toggleMode();
 
         this.player.update(dt, actions, this.raceStarted, this.raceTime);
+        this.aiManager.update(dt, this.raceStarted, this.raceTime);
+        this.positionManager.computeRanking(this.allRacers);
 
         if (!this.raceFinished && this.player.lapManager.finished) {
             this.raceFinished = true;
@@ -187,14 +205,15 @@ export default class Game {
 
     _render(dt) {
         this.cameraManager.update(this.player.state, dt, this.player.driftAngle, this.inputManager.actions.lookBack);
-        this.driftEffects.update(this.player, dt, this.camera);
+        for (const racer of this.allRacers) this.driftEffects.spawnForRacer(racer, dt);
+        this.driftEffects.render(dt, this.camera);
 
         this.hud.update({
             speedKmh: this.player.getSpeedKmh(),
             lap: this.player.lapManager.lap,
             totalLaps: this.totalLaps,
-            position: 1,
-            totalRacers: 1,
+            position: this.player.racePosition || 1,
+            totalRacers: this.allRacers.length,
             raceTime: this.raceTime,
             driftChargeLevel: this.player.state.drift.chargeLevel,
             driftChargeRatio: this.player.state.drift.chargeTime / this.player.state.config.driftChargeThresholds.gold,
@@ -219,6 +238,7 @@ export default class Game {
             `Speed: ${s.speed.toFixed(2)} (${this.player.getSpeedKmh().toFixed(0)} km/h)`,
             `Surface: ${s.surface}  Drift: ${s.drift.active} (${s.drift.chargeLevel})`,
             `Checkpoint segment: ${this.player.lapManager.currentSegment}  Lap: ${this.player.lapManager.lap}/${this.totalLaps}`,
+            `Race pos: ${this.player.racePosition || 1}/${this.allRacers.length}  AI racers: ${this.aiManager.getRacers().length}`,
             `Active input: ${this.inputManager.activeDevice}`,
             gp ? `Gamepad: ${gp.id}` : 'Gamepad: none',
             gp ? `Mapping: ${gp.mapping}  Axis0: ${gp.axes[0]?.toFixed(2)}` : '',
