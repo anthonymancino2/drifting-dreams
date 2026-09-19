@@ -1,0 +1,306 @@
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #02040f;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    color: #fff;
+}
+
+#game-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+#hud-root {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    font-weight: 700;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.55);
+}
+
+#hud-top-left {
+    position: absolute;
+    left: 20px;
+    bottom: 20px;
+}
+
+#hud-speed {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+#hud-speed-value {
+    font-size: 56px;
+    line-height: 1;
+}
+
+#hud-speed-unit {
+    font-size: 16px;
+    opacity: 0.8;
+}
+
+#hud-top-right {
+    position: absolute;
+    right: 20px;
+    top: 16px;
+    text-align: right;
+    font-size: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#hud-time {
+    font-size: 16px;
+    opacity: 0.85;
+    font-variant-numeric: tabular-nums;
+}
+
+#hud-bottom-left {
+    position: absolute;
+    left: 20px;
+    bottom: 92px;
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bar-base {
+    width: 100%;
+    height: 10px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.15);
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.25);
+}
+
+#hud-drift-bar, #hud-boost-bar {
+    width: 100%;
+    height: 10px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.15);
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.25);
+}
+
+#hud-drift-fill {
+    height: 100%;
+    width: 0%;
+    background: #6fa8ff;
+    transition: background 0.15s;
+}
+#hud-drift-fill.charge-blue { background: #4fc3ff; }
+#hud-drift-fill.charge-purple { background: #b35bff; }
+#hud-drift-fill.charge-gold { background: #ffd23c; box-shadow: 0 0 8px #ffd23c; }
+
+#hud-boost-fill {
+    height: 100%;
+    width: 0%;
+    background: #ff8a3d;
+}
+#hud-boost-fill.active { box-shadow: 0 0 10px #ff8a3d; }
+
+#hud-prompts {
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    opacity: 0.9;
+}
+#hud-prompts .prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+#hud-prompts b {
+    font-size: 14px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 4px;
+    padding: 2px 8px;
+}
+
+#hud-toast {
+    position: absolute;
+    top: 90px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: rgba(0,0,0,0.55);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    white-space: pre-line;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.25s, transform 0.25s;
+}
+#hud-toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+#hud-countdown {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 90px;
+    color: #fff;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.6);
+}
+#hud-countdown.pulse {
+    animation: countdownPulse 0.5s ease-out;
+}
+@keyframes countdownPulse {
+    from { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+    to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+#hud-daynight-toggle {
+    position: absolute;
+    top: 16px;
+    left: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    pointer-events: all;
+    cursor: pointer;
+}
+
+#debug-overlay {
+    position: absolute;
+    left: 20px;
+    top: 16px;
+    background: rgba(0,0,0,0.6);
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    font-family: 'SF Mono', Menlo, monospace;
+    max-width: 320px;
+}
+
+/* --- Touch controls --- */
+#touch-controls {
+    position: fixed;
+    inset: 0;
+    display: none;
+    pointer-events: none;
+    z-index: 5;
+}
+.touch-zone {
+    position: absolute;
+    bottom: 0;
+    pointer-events: all;
+}
+#touch-joystick-zone {
+    left: 0;
+    width: 45%;
+    height: 55%;
+}
+#touch-joystick-base {
+    position: absolute;
+    left: 40px;
+    bottom: 40px;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    border: 2px solid rgba(255,255,255,0.3);
+}
+#touch-joystick-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 60px;
+    height: 60px;
+    margin: -30px 0 0 -30px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.45);
+    transition: transform 0.03s linear;
+}
+#touch-action-zone {
+    right: 0;
+    width: 55%;
+    height: 60%;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-end;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 0 24px 30px 0;
+}
+.touch-btn {
+    pointer-events: all;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.14);
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    width: 72px;
+    height: 72px;
+}
+.touch-btn:active {
+    background: rgba(255,255,255,0.35);
+}
+.touch-btn-throttle, .touch-btn-brake {
+    width: 84px;
+    height: 84px;
+    font-size: 14px;
+}
+.touch-btn-throttle { background: rgba(80,200,120,0.25); }
+.touch-btn-brake { background: rgba(220,80,80,0.25); }
+.touch-btn-drift { background: rgba(79,195,255,0.25); }
+.touch-btn-boost { background: rgba(255,138,61,0.25); }
+
+#orientation-lock {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #000;
+    color: #fff;
+    z-index: 999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    font-size: 22px;
+    gap: 8px;
+}
+#orientation-lock .sub {
+    font-size: 14px;
+    opacity: 0.7;
+    font-weight: 400;
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+    #orientation-lock { display: flex; }
+}
