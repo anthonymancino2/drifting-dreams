@@ -8,9 +8,18 @@ export default class VehicleVisual {
     constructor(scene, color = 0x3d7cff) {
         this.root = new THREE.Object3D();
 
-        const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.25 });
-        const cabinMat = new THREE.MeshStandardMaterial({ color: 0x1a1d24, roughness: 0.3, metalness: 0.1 });
-        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.8 });
+        // Glossy clearcoat paint (picks up scene.environment reflections set in
+        // Game._buildEnvironmentReflections) - this is what gives the cars a
+        // "showroom" shine instead of flat matte plastic.
+        const bodyMat = new THREE.MeshPhysicalMaterial({
+            color, roughness: 0.35, metalness: 0.55,
+            clearcoat: 1.0, clearcoatRoughness: 0.12, envMapIntensity: 1.3
+        });
+        const cabinMat = new THREE.MeshPhysicalMaterial({
+            color: 0x14161c, roughness: 0.15, metalness: 0.2,
+            clearcoat: 1.0, clearcoatRoughness: 0.08, envMapIntensity: 1.1
+        });
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.8, envMapIntensity: 0.3 });
         const headlightMat = new THREE.MeshStandardMaterial({ color: 0xfff6d6, emissive: 0xfff6d6, emissiveIntensity: 1.0 });
         const brakeMat = new THREE.MeshStandardMaterial({ color: 0x330000, emissive: 0x550000, emissiveIntensity: 0.0 });
         this.brakeMat = brakeMat;

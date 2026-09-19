@@ -12,7 +12,13 @@ export default class GameLoop {
         this.accumulator = 0;
         this.lastTime = 0;
         this.running = false;
-        this.paused = document.hidden;
+        // Deliberately NOT seeded from document.hidden at construction: some browser
+        // contexts report hidden=true transiently at load with no guaranteed matching
+        // visibilitychange transition later, which would leave the loop paused forever
+        // on a frozen frame - worse than the rare "loaded already backgrounded" case
+        // this would have covered. The visibilitychange listener below still catches
+        // the normal case (tab genuinely backgrounded after the page is running).
+        this.paused = false;
         this.frameTimeMs = 0;
         this.fps = 0;
         this._fpsSmoothing = 0;

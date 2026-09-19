@@ -20,6 +20,7 @@ export default class TrackManager {
         this._buildGuidanceLines();
         this._buildBarriers();
         this._buildTrackLights();
+        this._buildMountains();
         this._buildCheckpointMarkers();
     }
 
@@ -71,7 +72,7 @@ export default class TrackManager {
         geometry.setIndex(indices);
         geometry.computeVertexNormals();
 
-        const material = new THREE.MeshStandardMaterial({ color: this.definition.roadColor, roughness: 0.9, metalness: 0.05, side: THREE.DoubleSide });
+        const material = new THREE.MeshStandardMaterial({ color: this.definition.roadColor, roughness: 0.9, metalness: 0.05, envMapIntensity: 0.15, side: THREE.DoubleSide });
         const mesh = new THREE.Mesh(geometry, material);
         mesh.receiveShadow = true;
         this.group.add(mesh);
@@ -100,14 +101,14 @@ export default class TrackManager {
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         geometry.setIndex(indices);
         geometry.computeVertexNormals();
-        const material = new THREE.MeshStandardMaterial({ color: this.definition.shoulderColor, roughness: 1.0, side: THREE.DoubleSide });
+        const material = new THREE.MeshStandardMaterial({ color: this.definition.shoulderColor, roughness: 1.0, envMapIntensity: 0.1, side: THREE.DoubleSide });
         const mesh = new THREE.Mesh(geometry, material);
         mesh.receiveShadow = true;
         this.group.add(mesh);
 
         const groundGeo = new THREE.PlaneGeometry(2000, 2000);
         groundGeo.rotateX(-Math.PI / 2);
-        const groundMat = new THREE.MeshStandardMaterial({ color: this.definition.groundColor, roughness: 1.0 });
+        const groundMat = new THREE.MeshStandardMaterial({ color: this.definition.groundColor, roughness: 1.0, envMapIntensity: 0.1 });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.position.y = -0.02;
         ground.receiveShadow = true;
@@ -200,6 +201,46 @@ export default class TrackManager {
         }
         this.group.add(lightsGroup);
         this.environment.onModeChange((mode) => this.setNightLightIntensity(mode === 'night'));
+    }
+
+    // Distant low-poly mountain ring so the horizon isn't flat grass to infinity in
+    // every direction - cheap depth cue (one InstancedMesh, no shadows, no dynamic
+    // reflections) that reads fine even from a fast-moving chase camera.
+    _buildMountains() {
+        let cx = 0, cz = 0;
+        for (const p of this.samples) { cx += p.x; cz += p.z; }
+        cx /= this.samples.length;
+        cz /= this.samples.length;
+        let maxDist = 0;
+        for (const p of this.samples) maxDist = Math.max(maxDist, Math.hypot(p.x - cx, p.z - cz));
+        const ringRadius = maxDist + 220;
+
+        const count = 48;
+        const geometry = new THREE.ConeGeometry(1, 1, 6);
+        const material = new THREE.MeshStandardMaterial({ color: 0x5b6f8a, roughness: 1.0, envMapIntensity: 0, fog: true });
+        const instanced = new THREE.InstancedMesh(geometry, material, count);
+        instanced.castShadow = false;
+        instanced.receiveShadow = false;
+
+        const dummy = new THREE.Object3D();
+        const colorAttr = new Float32Array(count * 3);
+        const baseColor = new THREE.Color();
+        for (let i = 0; i < count; i++) {
+            const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
+            const radius = ringRadius + (Math.random() - 0.5) * 60;
+            const height = 60 + Math.random() * 110;
+            const width = 45 + Math.random() * 70;
+            dummy.position.set(cx + Math.cos(angle) * radius, height / 2 - 8, cz + Math.sin(angle) * radius);
+            dummy.rotation.y = Math.random() * Math.PI;
+            dummy.scale.set(width, height, width);
+            dummy.updateMatrix();
+            instanced.setMatrixAt(i, dummy.matrix);
+            const shade = 0.75 + Math.random() * 0.35;
+            baseColor.setRGB(0.36 * shade, 0.44 * shade, 0.56 * shade);
+            baseColor.toArray(colorAttr, i * 3);
+        }
+        instanced.instanceColor = new THREE.InstancedBufferAttribute(colorAttr, 3);
+        this.group.add(instanced);
     }
 
     _buildCheckpointMarkers() {

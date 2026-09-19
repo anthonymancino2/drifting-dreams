@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import Environment from './Environment.js';
+import PostProcessing from './PostProcessing.js';
 import SettingsManager from './SettingsManager.js';
 import SaveManager from './SaveManager.js';
 import GameLoop from './GameLoop.js';
@@ -34,6 +36,7 @@ export default class Game {
 
         this._buildRenderer();
         this._buildScene();
+        this._buildEnvironmentReflections();
 
         this.environment = new Environment(this.scene, this.renderer);
         this.environment.setMode(this.settings.get('dayNightMode'));
@@ -53,6 +56,8 @@ export default class Game {
         });
 
         this._applyGraphicsQuality(this.settings.get('graphicsQuality'));
+        this.postProcessing = new PostProcessing(this.renderer, this.scene, this.camera);
+        this.postProcessing.setEnabled(this.resolvedQuality !== 'low');
 
         this.totalLaps = 3;
         this.player = new RacerController({
@@ -109,6 +114,15 @@ export default class Game {
     _buildScene() {
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 800);
+    }
+
+    // Soft studio-style reflections on car paint (clearcoat/metal materials pick this up
+    // automatically via scene.environment) without loading an external HDRI file - this
+    // is the "glossy showroom" look on the cars, not a visible skybox.
+    _buildEnvironmentReflections() {
+        const pmrem = new THREE.PMREMGenerator(this.renderer);
+        this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        pmrem.dispose();
     }
 
     _applyGraphicsQuality(quality) {
@@ -223,7 +237,8 @@ export default class Game {
 
         this._updateDebugOverlay();
 
-        this.renderer.render(this.scene, this.camera);
+        if (this.postProcessing.enabled) this.postProcessing.render();
+        else this.renderer.render(this.scene, this.camera);
     }
 
     _updateDebugOverlay() {
@@ -252,5 +267,6 @@ export default class Game {
         this.camera.aspect = w / h;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(w, h);
+        this.postProcessing?.setSize(w, h);
     }
 }
