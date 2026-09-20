@@ -526,7 +526,14 @@
         player.moveHeading=angDamp(player.moveHeading,trackHeading,5,dt)
       }
       updateLapProgress(player,info);
-      const driftAngle=angDelta(player.moveHeading,player.heading),driftMag=Math.abs(driftAngle),sliding=driftMag>.1&&speedAbs>9;
+      // This threshold used to be .1 rad (~6 degrees) - but normal, non-handbrake
+      // steering had crept (across several tuning passes) up to ~10-11 degrees of its
+      // own natural slip, meaning ordinary turning was CONSTANTLY crossing it: smoke,
+      // drift score, and nitro-charging were all firing off plain steering with no
+      // handbrake ever touched. That's backwards for a drift game - the smoke should
+      // mean something. Raised well above what normal turning can reach on its own, so
+      // this now only fires for a real, deliberate slide.
+      const driftAngle=angDelta(player.moveHeading,player.heading),driftMag=Math.abs(driftAngle),sliding=driftMag>.53&&speedAbs>9;
       // Nitro is now EARNED by drifting, not free over time - the whole reason to drift
       // during a race instead of just driving clean is that a good slide through a
       // corner is what actually fills the tank for the boost you need on the next
@@ -562,8 +569,11 @@
       // rails. Straights/gentle curves keep the tighter grip so it still drives sanely.
       const aiCornering=Math.abs(c.steer)>.42&&Math.abs(c.speed)>18;
       c.moveHeading=angDamp(c.moveHeading,c.heading,aiCornering?4.2:13,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}
+      // Same fix as the player's threshold below - only show smoke/skid marks for a
+      // slide big enough to actually read as one, not every minor angle its normal
+      // (non-cornering) grip can produce on its own.
       const aiDriftMag=Math.abs(angDelta(c.moveHeading,c.heading));
-      if(aiDriftMag>.12&&Math.abs(c.speed)>15){
+      if(aiDriftMag>.5&&Math.abs(c.speed)>15){
         if(c._lastPuff===undefined)c._lastPuff=0;
         c._lastPuff-=dt;
         if(c._lastPuff<=0){const hs=Math.sin(c.heading),hc=Math.cos(c.heading),bx=-hs*1.5,bz=-hc*1.5,sx=hc*.7,sz=-hs*.7;puff(vA.set(c.position.x+bx-sx,c.position.y+.3,c.position.z+bz-sz),.85);puff(vB.set(c.position.x+bx+sx,c.position.y+.3,c.position.z+bz+sz),.85);c._lastPuff=.06}
