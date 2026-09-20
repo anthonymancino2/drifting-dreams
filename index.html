@@ -85,7 +85,7 @@
     <div id="debugReadout" hidden></div>
     <div id="nitro"><div id="nitroFill"></div></div><div id="banner">3</div>
   </div>
-  <section id="attract" class="screen"><div class="menuCard"><div class="eyebrow">A TRUE 3D DRIFT RACE</div><div class="logo">DRIFTING<span>DREAMS</span></div><p class="tag">Twelve real 3D cars. Full 360° camera. Weight transfer, counter-steer, tire smoke and speed you can feel.</p><div id="attractPrompt">PRESS ANY KEY, BUTTON OR TAP TO CONTINUE</div></div><button id="updateBtn">⟳ CHECK FOR UPDATE</button><button id="controlsBtn">⚙ CONTROLS &amp; MAPPING</button></section>
+  <section id="attract" class="screen"><div class="menuCard"><div class="eyebrow">A TRUE 3D DRIFT RACE</div><div class="logo">DRIFTING<span>DREAMS</span></div><p class="tag">Twelve real 3D cars. Full 360° camera. Long, exaggerated sideways slides, tire smoke and speed you can feel.</p><div id="attractPrompt">PRESS ANY KEY, BUTTON OR TAP TO CONTINUE</div></div><button id="updateBtn">⟳ CHECK FOR UPDATE</button><button id="controlsBtn">⚙ CONTROLS &amp; MAPPING</button></section>
   <section id="vehicleSelect" class="screen hidden"><div class="menuCard wideCard"><div class="eyebrow">STEP 1 OF 2</div><div class="logo" style="font-size:clamp(32px,4.8vw,52px)">CHOOSE YOUR<span>CAR</span></div><div class="pickRow" id="vehicleRow"></div><div class="bigBtnRow"><button class="ghostBtn" id="vehicleBack">BACK</button><button class="ctaBtn" id="vehicleNext">SELECT CAR</button></div></div></section>
   <section id="trackSelect" class="screen hidden"><div class="menuCard wideCard"><div class="eyebrow">STEP 2 OF 2</div><div class="logo" style="font-size:clamp(32px,4.8vw,52px)">CHOOSE YOUR<span>TRACK</span></div><div class="pickRow" id="trackRow"></div><div class="bigBtnRow"><button class="ghostBtn" id="trackBack">BACK</button><button class="ctaBtn" id="trackNext">START RACE</button></div></div></section>
   <section id="controlsScreen" class="screen hidden"><div class="menuCard wideCard settingsPanel"><div class="eyebrow">SETTINGS</div><div class="logo" style="font-size:clamp(28px,4.4vw,44px)">CONTROL<span>MAPPING</span></div><div id="gpStatus">No controller detected</div><div id="bindList"></div><div class="bigBtnRow"><button class="ghostBtn" id="bindReset">RESET TO DEFAULTS</button><button class="ctaBtn" id="bindBack">DONE</button></div></div></section>
@@ -564,18 +564,19 @@
       // the effective grip and pulls the car back into line.
       const speedFactor=THREE.MathUtils.clamp(speedAbs/18,.2,1),rollingFactor=THREE.MathUtils.clamp(speedAbs/2,0,1),dirSign=player.speed>=0?1:-1;
       const slipNow=angDelta(player.moveHeading,player.heading);
-      // Countersteer only exists inside this `if(player._driftActive)` block - normal
-      // (non-drift) turning always uses the plain desiredYaw above and never sees
-      // `counter` at all, so it can't be affected by any of the widening below.
+      // Countersteer removed entirely - steering the opposite way during a drift no
+      // longer catches/reduces the slide at all. The ONLY way to end a drift now is
+      // releasing the handbrake (or dropping below the speed floor), so a committed
+      // slide just holds, long and exaggerated, until you actually let go of it.
       let desiredYaw=player.steer*(.6+1.05*speedFactor)*sm.handlingMult*dirSign;
-      let counter=0;
       if(player._driftActive){
         const same=Math.max(0,player.steer*player._driftDir);
-        counter=Math.max(0,-player.steer*player._driftDir);
-        // Pushed further: the natural (non-clamped) slide target this settles into is
-        // now up to ~58 degrees (was ~31), same/counter-steer shape kept identical.
-        const targetSlip=player._driftDir*(.4+.48*same+.13*speedFactor-.18*counter);
-        const slideYaw=player._driftDir*(.55+1*same-.27*counter)*(.55+.45*speedFactor);
+        // Pushed further still: the natural (non-clamped) slide target this settles
+        // into is now up to ~72 degrees (was ~58), and with countersteer gone there's
+        // no way to shrink it early - it just holds there for as long as the handbrake
+        // stays down.
+        const targetSlip=player._driftDir*(.5+.6*same+.15*speedFactor);
+        const slideYaw=player._driftDir*(.65+1.2*same)*(.55+.45*speedFactor);
         desiredYaw=slideYaw+(targetSlip-slipNow)*2.1;
       }
       desiredYaw=THREE.MathUtils.clamp(desiredYaw*rollingFactor,-2.25,2.25);
@@ -583,13 +584,16 @@
       player.yawRate=THREE.MathUtils.lerp(player.yawRate,desiredYaw,1-Math.exp(-dt*yawResponse));
       player.heading+=player.yawRate*dt;
       const slipBeforeGrip=angDelta(player.moveHeading,player.heading);
-      let grip=player._driftActive?2.35+counter*1.8:(player._recoverTimer>0?5.8:12.5*sm.handlingMult);
-      // Soft-catch band and hard clamp both scaled up to match the wider target above -
-      // slide cap raised from ~41 to ~75 degrees for a much more extreme, showy angle.
-      if(player._driftActive&&Math.abs(slipBeforeGrip)>1.05)grip+=8*(Math.abs(slipBeforeGrip)-1.05)/.2;
+      // Grip cut even further (2.35->2.0) so moveHeading lags heading longer - the slide
+      // holds its angle (and keeps carrying the car sideways) for noticeably longer
+      // before it would even reach the soft-catch band below.
+      let grip=player._driftActive?2:(player._recoverTimer>0?5.8:12.5*sm.handlingMult);
+      // Soft-catch band and hard clamp both scaled up again to match the wider target -
+      // slide cap raised from ~75 to ~83 degrees for an even longer, more extreme angle.
+      if(player._driftActive&&Math.abs(slipBeforeGrip)>1.15)grip+=8*(Math.abs(slipBeforeGrip)-1.15)/.2;
       player.moveHeading=angDamp(player.moveHeading,player.heading,grip,dt);
       const limitedSlip=angDelta(player.moveHeading,player.heading);
-      if(player._driftActive&&Math.abs(limitedSlip)>1.3){player.heading=player.moveHeading+Math.sign(limitedSlip)*1.3;player.yawRate*=.7}
+      if(player._driftActive&&Math.abs(limitedSlip)>1.45){player.heading=player.moveHeading+Math.sign(limitedSlip)*1.45;player.yawRate*=.7}
       player.position.x+=Math.sin(player.moveHeading)*player.speed*dt;
       player.position.z+=Math.cos(player.moveHeading)*player.speed*dt;
       const info=nearestSample(player.position,player._sampleHint);player._sampleHint=info.index;const halfW=TRACK_W*.86,wallLimit=TRACK_W+2.5,absLat=Math.abs(info.lateral);player.position.y=THREE.MathUtils.lerp(player.position.y,info.y,1-Math.exp(-dt*22));
@@ -719,7 +723,7 @@
     function formatTime(s){const m=Math.floor(s/60),sec=Math.floor(s%60),ms=Math.floor(s%1*1000);return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')+'.'+String(ms).padStart(3,'0')}
     function updateHUD(){const mph=Math.round(Math.abs(player.speed)*2.23694),gear=mph<2?'N':Math.min(6,Math.max(1,Math.ceil(mph/27))),racerCount=cars.filter(c=>c.racer).length,ahead=cars.filter((c,i)=>i&&c.racer&&c.progress>player.progress).length;$('speed').textContent=mph;$('gear').textContent=gear;$('time').textContent=formatTime(raceTime);$('lap').textContent='LAP '+Math.min(3,player.lap)+'/3';$('position').innerHTML=(ahead+1)+'<span>/'+racerCount+'</span>';$('driftScore').textContent=driftScore;$('nitroFill').style.height=(nitro*94)+'%';drawSpeedGauge(mph,(input.nitro&&nitro>0)||player._miniBoostTimer>0);drawMap();
       const driftBox=$('drift'),driftState=$('driftState'),slipDeg=Math.round(Math.abs(angDelta(player.moveHeading,player.heading))*180/Math.PI);driftBox.classList.toggle('active',!!player._driftActive);driftBox.classList.toggle('boost',player._miniBoostTimer>0);
-      if(player._miniBoostTimer>0)driftState.textContent='MINI-TURBO '+['','I','II','III'][player._driftTier||1];else if(player._driftActive){const countering=Math.sign(player.steer)===-player._driftDir&&Math.abs(player.steer)>.12,tier=player._driftCharge>=2.15?'◆◆◆':player._driftCharge>=1.2?'◆◆':player._driftCharge>=.55?'◆':'◇';driftState.textContent=(countering?'COUNTERSTEER ':'SLIDE ')+slipDeg+'° '+tier}else driftState.textContent=input.drift?'STEER TO INITIATE':'HOLD DRIFT + STEER';
+      if(player._miniBoostTimer>0)driftState.textContent='MINI-TURBO '+['','I','II','III'][player._driftTier||1];else if(player._driftActive){const tier=player._driftCharge>=2.15?'◆◆◆':player._driftCharge>=1.2?'◆◆':player._driftCharge>=.55?'◆':'◇';driftState.textContent='SLIDE '+slipDeg+'° '+tier}else driftState.textContent=input.drift?'STEER TO INITIATE':'HOLD DRIFT + STEER';
       $('debugReadout').textContent='L:'+(input.left?1:0)+' R:'+(input.right?1:0)+' steer:'+player.steer.toFixed(2)+' heading:'+(player.heading*180/Math.PI%360).toFixed(0)+'° cam:'+camMode+' yaw:'+(orbitYaw*180/Math.PI).toFixed(0)+'°';
     }
     function resetRace(){raceTime=0;countdown=3.7;nitro=1;driftScore=totalScore=0;camMode=0;orbitYaw=0;orbitPitch=.22;dragging=false;$('camLabel').textContent='CAM: CHASE · DRAG TO ORBIT';$('drift').classList.remove('active','boost');$('driftState').textContent='HOLD DRIFT + STEER';cars.forEach((c,i)=>{const st=spawnTransform(i);c.position.copy(st.position);c.heading=st.heading;c.moveHeading=st.heading;c.speed=0;c.steer=0;c.yawRate=0;c._driftActive=false;c._driftDir=0;c._driftCharge=0;c._recoverTimer=0;c._miniBoostTimer=0;c._miniBoostStrength=0;c._driftTier=0;c._skidAccum=0;c._lastIdx=null;c._sampleHint=null;c.lapDist=0;c.progress=0;c.lap=1;placeCar(c)});mode='countdown';$('hud').classList.add('on');$('touch').classList.add('show');showScreen(null)}
