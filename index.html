@@ -504,10 +504,17 @@
       if(nitroBoost)nitro=Math.max(0,nitro-dt*.24);
       const miniBoost=player._miniBoostTimer>0;
       if(miniBoost)player._miniBoostTimer=Math.max(0,player._miniBoostTimer-dt);
-      const baseTop=40*sm.speedMult,top=nitroBoost?62*sm.speedMult:baseTop+(miniBoost?player._miniBoostStrength*.9:0);
-      const accel=gasAmt*(nitroBoost?32:18)*sm.accelMult,miniAccel=miniBoost?player._miniBoostStrength:0,brake=brakeAmt*30;
-      player.speed+=(accel+miniAccel-brake)*dt;
-      const rollingDrag=.65+Math.abs(player.speed)*.012+(player._driftActive?.95:0);
+      const baseTop=40*sm.speedMult;
+      // Drifting is the fast line now, not just the mini-turbo payout you get after
+      // releasing it - a real top-speed bonus applies for the whole time the slide is
+      // active, plus a forward thrust while sliding, and the old extra drag that used to
+      // bleed speed off DURING a drift is cut way down so holding the slide doesn't
+      // fight the reward for doing it. Normal (non-drift) driving is untouched.
+      const driftTopBonus=player._driftActive?1.3:1;
+      const top=nitroBoost?62*sm.speedMult:baseTop*driftTopBonus+(miniBoost?player._miniBoostStrength*.9:0);
+      const accel=gasAmt*(nitroBoost?32:18)*sm.accelMult,miniAccel=miniBoost?player._miniBoostStrength:0,driftThrust=player._driftActive&&Math.abs(player.speed)>8?10*sm.accelMult:0,brake=brakeAmt*30;
+      player.speed+=(accel+miniAccel+driftThrust-brake)*dt;
+      const rollingDrag=.65+Math.abs(player.speed)*.012+(player._driftActive?.25:0);
       if(player.speed>0)player.speed=Math.max(0,player.speed-rollingDrag*dt);else if(player.speed<0)player.speed=Math.min(0,player.speed+rollingDrag*dt);
       player.speed=THREE.MathUtils.clamp(player.speed,brakeAmt>0&&gasAmt<=0?-8:0,top);
 
@@ -538,13 +545,18 @@
       // the effective grip and pulls the car back into line.
       const speedFactor=THREE.MathUtils.clamp(speedAbs/18,.2,1),rollingFactor=THREE.MathUtils.clamp(speedAbs/2,0,1),dirSign=player.speed>=0?1:-1;
       const slipNow=angDelta(player.moveHeading,player.heading);
+      // Countersteer only exists inside this `if(player._driftActive)` block - normal
+      // (non-drift) turning always uses the plain desiredYaw above and never sees
+      // `counter` at all, so it can't be affected by any of the widening below.
       let desiredYaw=player.steer*(.6+1.05*speedFactor)*sm.handlingMult*dirSign;
       let counter=0;
       if(player._driftActive){
         const same=Math.max(0,player.steer*player._driftDir);
         counter=Math.max(0,-player.steer*player._driftDir);
-        const targetSlip=player._driftDir*(.22+.26*same+.07*speedFactor-.18*counter);
-        const slideYaw=player._driftDir*(.38+.72*same-.27*counter)*(.55+.45*speedFactor);
+        // Pushed further: the natural (non-clamped) slide target this settles into is
+        // now up to ~58 degrees (was ~31), same/counter-steer shape kept identical.
+        const targetSlip=player._driftDir*(.4+.48*same+.13*speedFactor-.18*counter);
+        const slideYaw=player._driftDir*(.55+1*same-.27*counter)*(.55+.45*speedFactor);
         desiredYaw=slideYaw+(targetSlip-slipNow)*2.1;
       }
       desiredYaw=THREE.MathUtils.clamp(desiredYaw*rollingFactor,-2.25,2.25);
@@ -553,10 +565,12 @@
       player.heading+=player.yawRate*dt;
       const slipBeforeGrip=angDelta(player.moveHeading,player.heading);
       let grip=player._driftActive?2.35+counter*1.8:(player._recoverTimer>0?5.8:12.5*sm.handlingMult);
-      if(player._driftActive&&Math.abs(slipBeforeGrip)>.62)grip+=8*(Math.abs(slipBeforeGrip)-.62)/.18;
+      // Soft-catch band and hard clamp both scaled up to match the wider target above -
+      // slide cap raised from ~41 to ~75 degrees for a much more extreme, showy angle.
+      if(player._driftActive&&Math.abs(slipBeforeGrip)>1.05)grip+=8*(Math.abs(slipBeforeGrip)-1.05)/.2;
       player.moveHeading=angDamp(player.moveHeading,player.heading,grip,dt);
       const limitedSlip=angDelta(player.moveHeading,player.heading);
-      if(player._driftActive&&Math.abs(limitedSlip)>.72){player.heading=player.moveHeading+Math.sign(limitedSlip)*.72;player.yawRate*=.7}
+      if(player._driftActive&&Math.abs(limitedSlip)>1.3){player.heading=player.moveHeading+Math.sign(limitedSlip)*1.3;player.yawRate*=.7}
       player.position.x+=Math.sin(player.moveHeading)*player.speed*dt;
       player.position.z+=Math.cos(player.moveHeading)*player.speed*dt;
       const info=nearestSample(player.position,player._sampleHint);player._sampleHint=info.index;const halfW=TRACK_W*.86,wallLimit=TRACK_W+2.5,absLat=Math.abs(info.lateral);player.position.y=THREE.MathUtils.lerp(player.position.y,info.y,1-Math.exp(-dt*22));
