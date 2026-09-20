@@ -82,7 +82,46 @@
     const SAMPLE_N=300,SAMPLES=[];{let acc=0,prev=null;for(let i=0;i<=SAMPLE_N;i++){const u=i/SAMPLE_N,fr=frame(u);if(prev)acc+=fr.p.distanceTo(prev);SAMPLES.push({p:fr.p.clone(),t:fr.t.clone(),side:fr.side.clone(),arc:acc});prev=fr.p}}
     const TRACK_LEN=SAMPLES[SAMPLE_N].arc;
     function wrapArc(a){return((a%TRACK_LEN)+TRACK_LEN)%TRACK_LEN}
-    function nearestSample(pos){let best=1e9,bi=0;for(let i=0;i<SAMPLE_N;i++){const d=SAMPLES[i].p.distanceToSquared(pos);if(d<best){best=d;bi=i}}const s=SAMPLES[bi],dx=pos.x-s.p.x,dz=pos.z-s.p.z;return{index:bi,arc:s.arc,lateral:dx*s.side.x+dz*s.side.z,tangent:s.t,side:s.side,y:s.p.y}}
+    function nearestSample(pos,hint){
+      let bi;
+      if(hint==null){
+        // No hint (first frame / just reset): brute-force nearest-point search is fine
+        // here since there's no prior position to walk from.
+        let best=1e9;bi=0;
+        for(let i=0;i<SAMPLE_N;i++){const d=SAMPLES[i].p.distanceToSquared(pos);if(d<best){best=d;bi=i}}
+      }else{
+        // On a tight hairpin, two far-apart-in-arc-length stretches of track can pass
+        // close together in world space, so a nearest-point search (even windowed around
+        // the last index) can land on a sample that only LOOKS close but isn't actually
+        // the segment the car is on - the interpolation below then blends toward the
+        // wrong neighbor and the car visibly pops several units up or down. Instead, walk
+        // from the last known sample one step at a time in whichever direction the car's
+        // position actually projects along the track's own tangent, stopping as soon as
+        // the position falls within the current segment's span. Since the car can't cross
+        // more than a couple of ~6-unit samples in a single frame, this always lands on
+        // the true local segment instead of jumping across the track.
+        bi=hint;
+        for(let iter=0;iter<8;iter++){
+          const s=SAMPLES[bi],ns=SAMPLES[(bi+1)%SAMPLE_N];
+          const along=(pos.x-s.p.x)*s.t.x+(pos.z-s.p.z)*s.t.z;
+          const segLen=Math.max(.0001,Math.hypot(ns.p.x-s.p.x,ns.p.z-s.p.z));
+          if(along<0){bi=(bi-1+SAMPLE_N)%SAMPLE_N;continue}
+          if(along>segLen){bi=(bi+1)%SAMPLE_N;continue}
+          break
+        }
+      }
+      const s=SAMPLES[bi],dx=pos.x-s.p.x,dz=pos.z-s.p.z;
+      // Elevation was snapping to whichever of only 300 track samples is nearest
+      // (~5.6 units apart on average) - fine on flat ground, but on a steep section
+      // two adjacent samples can differ by several units of height, so the car would
+      // visibly pop between "slightly floating" and "slightly sunk" as it crossed
+      // from one sample's zone to the next. Interpolate between the nearest sample
+      // and whichever neighbor the car is actually leaning toward along the track's
+      // own tangent, so height varies smoothly and matches the rendered road exactly.
+      const along=dx*s.t.x+dz*s.t.z,ni=along>=0?(bi+1)%SAMPLE_N:(bi-1+SAMPLE_N)%SAMPLE_N,ns=SAMPLES[ni];
+      const segLen=Math.max(.0001,Math.hypot(ns.p.x-s.p.x,ns.p.z-s.p.z)),frac=THREE.MathUtils.clamp(Math.abs(along)/segLen,0,1);
+      return{index:bi,arc:s.arc,lateral:dx*s.side.x+dz*s.side.z,tangent:s.t,side:s.side,y:THREE.MathUtils.lerp(s.p.y,ns.p.y,frac)}
+    }
     function pointAtArc(arc,lateral=0){const a=wrapArc(arc);const bi=Math.max(0,Math.min(SAMPLE_N-1,Math.floor(a/TRACK_LEN*SAMPLE_N)));const s=SAMPLES[bi];return vC.set(s.p.x+s.side.x*lateral,s.p.y+s.side.y*lateral,s.p.z+s.side.z*lateral)}
     function angDelta(a,b){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return d}
     function angDamp(cur,target,lambda,dt){return cur+angDelta(cur,target)*(1-Math.exp(-lambda*dt))}
@@ -196,7 +235,7 @@
       player.moveHeading=angDamp(player.moveHeading,player.heading,grip,dt);
       player.position.x+=Math.sin(player.moveHeading)*player.speed*dt;
       player.position.z+=Math.cos(player.moveHeading)*player.speed*dt;
-      const info=nearestSample(player.position),halfW=TRACK_W*.86,wallLimit=TRACK_W+2.5,absLat=Math.abs(info.lateral);player.position.y=THREE.MathUtils.lerp(player.position.y,info.y,1-Math.exp(-dt*10));
+      const info=nearestSample(player.position,player._sampleHint);player._sampleHint=info.index;const halfW=TRACK_W*.86,wallLimit=TRACK_W+2.5,absLat=Math.abs(info.lateral);player.position.y=THREE.MathUtils.lerp(player.position.y,info.y,1-Math.exp(-dt*22));
       if(absLat>halfW){const excess=Math.min(absLat,wallLimit)-halfW;player.speed-=(2+excess*.8)*dt}
       if(absLat>wallLimit){const dir=Math.sign(info.lateral),s=SAMPLES[info.index];player.position.x=s.p.x+info.side.x*wallLimit*dir;player.position.z=s.p.z+info.side.z*wallLimit*dir;
         // A wall you can get physically stuck facing into (nothing was ever pulling
@@ -212,7 +251,7 @@
       const driftAngle=angDelta(player.moveHeading,player.heading),sliding=Math.abs(driftAngle)>.1&&speedAbs>9;
       if(sliding){const pts=Math.round(Math.abs(driftAngle)*speedAbs*5.5);driftScore+=pts;totalScore+=pts;lastPuff-=dt;if(lastPuff<=0){const hs=Math.sin(player.heading),hc=Math.cos(player.heading),bx=-hs*1.65,bz=-hc*1.65,sx=hc*.78,sz=-hs*.78;puff(vA.set(player.position.x+bx-sx,player.position.y+.3,player.position.z+bz-sz),1.15);puff(vB.set(player.position.x+bx+sx,player.position.y+.3,player.position.z+bz+sz),1.15);lastPuff=.035}}else{driftScore=0}
       placeCar(player,dt)}
-    function updateAI(dt){for(let i=1;i<cars.length;i++){const c=cars[i],info=nearestSample(c.position),lookAhead=9+Math.abs(c.speed)*.35,preferredLane=((i%3)-1)*4.5+Math.sin(raceTime*.15+c.seed)*1.1,tp=pointAtArc(info.arc+lookAhead,preferredLane),dx=tp.x-c.position.x,dz=tp.z-c.position.z,desiredHeading=Math.atan2(dx,dz),err=angDelta(c.heading,desiredHeading);c.position.y=THREE.MathUtils.lerp(c.position.y,info.y,1-Math.exp(-dt*10));c.steer=THREE.MathUtils.clamp(err*2.4,-1,1);const target=c.base+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.0*speedFactor*dt;c.moveHeading=angDamp(c.moveHeading,c.heading,9.5,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position),absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}updateLapProgress(c,info);placeCar(c,dt)}}
+    function updateAI(dt){for(let i=1;i<cars.length;i++){const c=cars[i],info=nearestSample(c.position,c._sampleHint);c._sampleHint=info.index;const lookAhead=9+Math.abs(c.speed)*.35,preferredLane=((i%3)-1)*4.5+Math.sin(raceTime*.15+c.seed)*1.1,tp=pointAtArc(info.arc+lookAhead,preferredLane),dx=tp.x-c.position.x,dz=tp.z-c.position.z,desiredHeading=Math.atan2(dx,dz),err=angDelta(c.heading,desiredHeading);c.position.y=THREE.MathUtils.lerp(c.position.y,info.y,1-Math.exp(-dt*22));c.steer=THREE.MathUtils.clamp(err*2.4,-1,1);const target=c.base+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.0*speedFactor*dt;c.moveHeading=angDamp(c.moveHeading,c.heading,9.5,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}updateLapProgress(c,info);placeCar(c,dt)}}
     function collisions(){for(let i=1;i<cars.length;i++){const c=cars[i],dx=c.position.x-player.position.x,dz=c.position.z-player.position.z,dist=Math.hypot(dx,dz);if(dist<3.2&&dist>.001){const nx=dx/dist,nz=dz/dist;player.speed*=.93;player.position.x-=nx*.12;player.position.z-=nz*.12;c.position.x+=nx*.12;c.position.z+=nz*.12}}}
     const camTarget=new THREE.Vector3(),camDesired=new THREE.Vector3(),look=new THREE.Vector3();
     function updateCamera(dt){const hs=Math.sin(player.heading),hc=Math.cos(player.heading),tx=hs,tz=hc,sx=-hc,sz=hs,speedAbs=Math.abs(player.speed);camTarget.set(player.position.x,player.position.y+1.15,player.position.z);let distance=8.8+Math.min(speedAbs,90)*.045,height=3.6,yaw=orbitYaw;if(camMode===1){camDesired.set(player.position.x+tx*1.1,player.position.y+1.22,player.position.z+tz*1.1);look.set(player.position.x+tx*18,player.position.y+.7,player.position.z+tz*18)}else{if(camMode===0&&!dragging){yaw=THREE.MathUtils.lerp(yaw,0,1-Math.exp(-dt*4));orbitYaw=yaw;orbitPitch=THREE.MathUtils.lerp(orbitPitch,.2,dt*2)}if(camMode===2){distance=9.7;height=2.4+Math.sin(orbitPitch)*7}const behindScale=-Math.cos(yaw)*distance,acrossScale=Math.sin(yaw)*distance;camDesired.set(camTarget.x+tx*behindScale+sx*acrossScale,camTarget.y+height,camTarget.z+tz*behindScale+sz*acrossScale);look.copy(camTarget)}
@@ -228,7 +267,7 @@
     function updateHUD(){const kmh=Math.round(Math.abs(player.speed)*3.6),gear=kmh<2?'N':Math.min(6,Math.max(1,Math.ceil(kmh/43))),ahead=cars.filter((c,i)=>i&&c.progress>player.progress).length;$('speed').textContent=kmh;$('gear').textContent=gear;$('time').textContent=formatTime(raceTime);$('lap').textContent='LAP '+player.lap+'/3';$('position').innerHTML=(ahead+1)+'<span>/12</span>';$('driftScore').textContent=driftScore;$('nitroFill').style.height=(nitro*94)+'%';drawMap();
       $('debugReadout').textContent='L:'+(input.left?1:0)+' R:'+(input.right?1:0)+' steer:'+player.steer.toFixed(2)+' heading:'+(player.heading*180/Math.PI%360).toFixed(0)+'° cam:'+camMode+' yaw:'+(orbitYaw*180/Math.PI).toFixed(0)+'°';
     }
-    function resetRace(){raceTime=0;countdown=3.7;nitro=1;driftScore=totalScore=0;camMode=0;orbitYaw=0;orbitPitch=.22;dragging=false;$('camLabel').textContent='CAM: CHASE · DRAG TO ORBIT';cars.forEach((c,i)=>{const st=spawnTransform(i);c.position.copy(st.position);c.heading=st.heading;c.moveHeading=st.heading;c.speed=0;c.steer=0;c._lastIdx=null;c.lapDist=0;c.progress=0;c.lap=1;placeCar(c)});mode='countdown';$('hud').classList.add('on');$('menu').classList.add('hidden')}
+    function resetRace(){raceTime=0;countdown=3.7;nitro=1;driftScore=totalScore=0;camMode=0;orbitYaw=0;orbitPitch=.22;dragging=false;$('camLabel').textContent='CAM: CHASE · DRAG TO ORBIT';cars.forEach((c,i)=>{const st=spawnTransform(i);c.position.copy(st.position);c.heading=st.heading;c.moveHeading=st.heading;c.speed=0;c.steer=0;c._lastIdx=null;c._sampleHint=null;c.lapDist=0;c.progress=0;c.lap=1;placeCar(c)});mode='countdown';$('hud').classList.add('on');$('menu').classList.add('hidden')}
     $('start').onclick=resetRace;
     function tick(){requestAnimationFrame(tick);let dt=Math.min(clock.getDelta(),.033);if(paused){composer.render();return}if(mode==='menu'){orbitYaw+=dt*.18;placeCar(player,dt);updateCamera(dt)}else if(mode==='countdown'){countdown-=dt;const n=Math.ceil(countdown);$('banner').textContent=n>0?n:'GO!';$('banner').classList.add('show');if(countdown<=0){mode='race';setTimeout(()=>{if(!paused)$('banner').classList.remove('show')},650)}updateCamera(dt);updateHUD()}else{raceTime+=dt;updatePlayer(dt);updateAI(dt);collisions();updateSmoke(dt);updateCamera(dt);updateHUD()}composer.render()}
     tick();
