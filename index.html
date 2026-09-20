@@ -177,15 +177,24 @@
       // (so you slide). Position always integrates along moveHeading, in world space -
       // nothing here auto-follows the track's curvature, so failing to steer through a
       // bend sends you straight off the road exactly like a real car.
-      const speedAbs=Math.abs(player.speed),speedFactor=THREE.MathUtils.clamp(speedAbs/8,0,1),dirSign=player.speed>=0?1:-1;
+      const speedAbs=Math.abs(player.speed),speedFactor=Math.max(.4,Math.min(1,speedAbs/8)),dirSign=player.speed>=0?1:-1;
       player.heading+=player.steer*3.3*speedFactor*dirSign*dt;
       const grip=input.drift?1.3:17;
       player.moveHeading=angDamp(player.moveHeading,player.heading,grip,dt);
       player.position.x+=Math.sin(player.moveHeading)*player.speed*dt;
       player.position.z+=Math.cos(player.moveHeading)*player.speed*dt;
       const info=nearestSample(player.position),halfW=TRACK_W*.86,wallLimit=TRACK_W+2.5,absLat=Math.abs(info.lateral);player.position.y=THREE.MathUtils.lerp(player.position.y,info.y,1-Math.exp(-dt*10));
-      if(absLat>halfW){const excess=Math.min(absLat,wallLimit)-halfW,dir=Math.sign(info.lateral);player.speed-=(9+excess*2.5)*dt*Math.max(1,excess)}
-      if(absLat>wallLimit){const dir=Math.sign(info.lateral),s=SAMPLES[info.index];player.position.x=s.p.x+info.side.x*wallLimit*dir;player.position.z=s.p.z+info.side.z*wallLimit*dir;player.speed-=player.speed*Math.min(1,10*dt)}
+      if(absLat>halfW){const excess=Math.min(absLat,wallLimit)-halfW;player.speed-=(2+excess*.8)*dt}
+      if(absLat>wallLimit){const dir=Math.sign(info.lateral),s=SAMPLES[info.index];player.position.x=s.p.x+info.side.x*wallLimit*dir;player.position.z=s.p.z+info.side.z*wallLimit*dir;
+        // A wall you can get physically stuck facing into (nothing was ever pulling
+        // heading back toward the track) means "just hold forward" never recovers -
+        // you need to know to counter-steer, which most players won't guess mid-crash.
+        // Nudge heading/moveHeading toward the track's own direction here, like a guide
+        // rail, so holding forward alone naturally redirects the car back onto the road.
+        const trackHeading=Math.atan2(s.t.x,s.t.z);
+        player.heading=angDamp(player.heading,trackHeading,3,dt);
+        player.moveHeading=angDamp(player.moveHeading,trackHeading,5,dt)
+      }
       updateLapProgress(player,info);
       const driftAngle=angDelta(player.moveHeading,player.heading),sliding=Math.abs(driftAngle)>.1&&speedAbs>9;
       if(sliding){const pts=Math.round(Math.abs(driftAngle)*speedAbs*5.5);driftScore+=pts;totalScore+=pts;lastPuff-=dt;if(lastPuff<=0){const hs=Math.sin(player.heading),hc=Math.cos(player.heading),bx=-hs*1.65,bz=-hc*1.65,sx=hc*.78,sz=-hs*.78;puff(vA.set(player.position.x+bx-sx,player.position.y+.3,player.position.z+bz-sz),1.15);puff(vB.set(player.position.x+bx+sx,player.position.y+.3,player.position.z+bz+sz),1.15);lastPuff=.035}}else{driftScore=0}
