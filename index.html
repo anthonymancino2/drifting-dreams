@@ -24,10 +24,31 @@
     #camLabel{position:absolute;right:clamp(18px,4vw,58px);bottom:clamp(100px,13vh,160px);padding:8px 14px;border-radius:11px;font-weight:900;font-size:clamp(11px,1.2vw,16px)}
     #nitro{position:absolute;right:clamp(18px,3.6vw,52px);bottom:clamp(25px,5vh,58px);width:20px;height:clamp(110px,18vh,220px);border:3px solid var(--cyan);border-radius:16px;padding:3px;background:#07151f;overflow:hidden}#nitroFill{position:absolute;left:3px;right:3px;bottom:3px;height:100%;border-radius:9px;background:linear-gradient(#fff,var(--cyan),#168bff);box-shadow:0 0 15px var(--cyan);transition:height .1s}
     #banner{position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);font-weight:1000;font-style:italic;font-size:clamp(56px,13vw,180px);letter-spacing:-.04em;filter:drop-shadow(0 8px 4px rgba(0,0,0,.55));opacity:0;transition:opacity .15s,transform .25s}#banner.show{opacity:1;transform:translate(-50%,-50%) scale(1.05)}
-    #menu{position:fixed;inset:0;z-index:6;display:grid;align-items:center;padding:clamp(18px,5vw,70px);background:linear-gradient(90deg,rgba(2,8,14,.93) 0%,rgba(2,8,14,.65) 42%,transparent 72%);transition:opacity .35s;pointer-events:auto}#menu.hidden{opacity:0;pointer-events:none}
-    .menuCard{width:min(540px,92vw)}.eyebrow{color:var(--cyan);font-weight:950;letter-spacing:.28em;font-size:13px}.logo{margin:8px 0 4px;font-weight:1000;font-style:italic;font-size:clamp(54px,8vw,108px);line-height:.78;letter-spacing:-.07em}.logo span{display:block;color:var(--cyan)}.tag{margin:20px 0;color:#cce2ec;max-width:470px;font-size:clamp(14px,1.7vw,19px);line-height:1.5}
-    #start{border:0;border-radius:13px;padding:15px 32px;background:linear-gradient(135deg,var(--yellow),#ff8a00);color:#151000;font:1000 italic 21px/1 inherit;box-shadow:0 10px 30px rgba(255,151,0,.35);cursor:pointer;transform:skew(-4deg)}#start:hover{filter:brightness(1.12);transform:skew(-4deg) scale(1.03)}
+    .screen{position:fixed;inset:0;z-index:6;display:grid;align-items:center;padding:clamp(18px,5vw,70px);background:linear-gradient(90deg,rgba(2,8,14,.93) 0%,rgba(2,8,14,.65) 42%,transparent 72%);transition:opacity .35s;pointer-events:auto}.screen.hidden{opacity:0;pointer-events:none}
+    .menuCard{width:min(540px,92vw)}.wideCard{width:min(780px,94vw)}.eyebrow{color:var(--cyan);font-weight:950;letter-spacing:.28em;font-size:13px}.logo{margin:8px 0 4px;font-weight:1000;font-style:italic;font-size:clamp(54px,8vw,108px);line-height:.78;letter-spacing:-.07em}.logo span{display:block;color:var(--cyan)}.tag{margin:20px 0;color:#cce2ec;max-width:470px;font-size:clamp(14px,1.7vw,19px);line-height:1.5}
+    .ctaBtn{border:0;border-radius:13px;padding:15px 32px;background:linear-gradient(135deg,var(--yellow),#ff8a00);color:#151000;font:1000 italic 21px/1 inherit;box-shadow:0 10px 30px rgba(255,151,0,.35);cursor:pointer;transform:skew(-4deg)}.ctaBtn:hover{filter:brightness(1.12);transform:skew(-4deg) scale(1.03)}
     .controls{display:grid;grid-template-columns:auto 1fr;gap:7px 12px;margin-top:20px;color:#d5e6ed;font-size:13px}.key{color:var(--cyan);font-weight:950;letter-spacing:.07em}
+    #attractPrompt{margin-top:28px;font-weight:950;font-size:clamp(14px,1.8vw,19px);color:var(--yellow);letter-spacing:.14em;animation:blink 1.4s ease-in-out infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.22}}
+    #controlsBtn{position:absolute;right:clamp(16px,3vw,40px);bottom:clamp(16px,3vh,40px);border:2px solid rgba(36,245,239,.5);background:rgba(4,19,28,.6);color:#cdeff2;padding:11px 20px;border-radius:11px;font-weight:900;font-size:13px;letter-spacing:.08em;cursor:pointer;pointer-events:auto}
+    #controlsBtn:hover{border-color:var(--cyan)}
+    .pickRow{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0;max-height:44vh;overflow-y:auto}
+    .pickCard{border:2px solid rgba(120,220,230,.25);background:rgba(6,20,30,.55);border-radius:14px;padding:14px 18px;cursor:pointer;min-width:126px;text-align:center;transition:border-color .15s,transform .15s}
+    .pickCard:hover{border-color:rgba(120,220,230,.55)}
+    .pickCard.active{border-color:var(--cyan);background:rgba(36,245,239,.14);transform:translateY(-3px)}
+    .pickCard b{display:block;font-size:14px;margin-bottom:4px}
+    .pickCard small{color:#9fd6dc;font-size:11px}
+    .bigBtnRow{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;align-items:center}
+    .ghostBtn{border:2px solid rgba(200,230,235,.35);background:transparent;color:#dff3f5;padding:13px 26px;border-radius:12px;font:900 15px/1 inherit;letter-spacing:.05em;cursor:pointer}
+    .ghostBtn:hover{border-color:#fff}
+    .bindRow{display:grid;grid-template-columns:1.15fr .85fr .85fr;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(120,200,210,.14)}
+    .bindHead{color:#8fd0d6;font-size:11px;letter-spacing:.1em;font-weight:900;padding-bottom:6px}
+    .bindRow b{font-size:13px;color:#e7f7f8;font-weight:800}
+    .bindKey{border:1px solid rgba(120,220,230,.4);background:rgba(6,20,30,.6);color:var(--cyan);padding:9px 10px;border-radius:8px;font-size:12px;font-weight:900;cursor:pointer;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bindKey.listening{border-color:var(--yellow);color:var(--yellow);animation:blink 1s ease-in-out infinite}
+    .settingsPanel{max-height:78vh;overflow-y:auto;padding-right:8px}
+    #bindList{margin:18px 0}
+    #gpStatus{margin-top:4px;font-size:12px;color:#9fd6dc;font-weight:700}
     #touch{position:fixed;inset:0;z-index:5;display:none;pointer-events:none}.touchBtn{pointer-events:auto;position:absolute;border:2px solid rgba(255,255,255,.62);background:rgba(3,15,23,.57);color:#fff;border-radius:50%;display:grid;place-content:center;font-weight:1000;backdrop-filter:blur(5px);user-select:none;-webkit-user-select:none}.touchBtn.on{background:rgba(36,245,239,.44);box-shadow:0 0 24px var(--cyan)}#left{left:18px;bottom:20px;width:74px;height:74px;font-size:35px}#right{left:101px;bottom:20px;width:74px;height:74px;font-size:35px}#gas{right:18px;bottom:19px;width:82px;height:82px;color:var(--cyan)}#brake{right:108px;bottom:23px;width:65px;height:65px}#driftBtn{right:24px;bottom:111px;width:68px;height:68px;color:var(--yellow)}#camBtn{right:108px;bottom:101px;width:66px;height:66px;color:var(--cyan);font-size:12px}
     #rotate{display:none;position:fixed;inset:0;z-index:20;background:#06121c;place-content:center;text-align:center;font-weight:1000;font-size:25px}#rotate small{display:block;color:var(--cyan);margin-top:10px;font-size:13px}
     @media (pointer:coarse),(max-width:820px){#touch{display:block}.controls{display:none}#mapWrap{width:112px;top:75px}#speedbox{width:122px;bottom:105px}#camLabel{display:none}#position{top:12px}.logo{font-size:56px}}
@@ -47,7 +68,10 @@
     <div id="debugReadout" style="position:absolute;left:14px;top:100px;font-size:11px;font-weight:700;background:rgba(0,0,0,.55);padding:6px 9px;border-radius:8px;line-height:1.5;font-style:normal;letter-spacing:0"></div>
     <div id="nitro"><div id="nitroFill"></div></div><div id="banner">3</div>
   </div>
-  <section id="menu"><div class="menuCard"><div class="eyebrow">A TRUE 3D DRIFT RACE</div><div class="logo">DRIFTING<span>DREAMS</span></div><p class="tag">Twelve real 3D cars. Full 360° camera. Weight transfer, counter-steer, tire smoke and speed you can feel.</p><button id="start">START ENGINE</button><div class="controls"><b class="key">W / ↑</b><span>Accelerate</span><b class="key">S / ↓</b><span>Brake / reverse</span><b class="key">A D / ← →</b><span>Steer left / right</span><b class="key">SPACE</b><span>Handbrake drift - fills your Nitro</span><b class="key">SHIFT</b><span>Nitro boost</span><b class="key">DRAG / Q E</b><span>Look 360° around car</span><b class="key">C</b><span>Cycle chase, hood, orbit</span></div></div></section>
+  <section id="attract" class="screen"><div class="menuCard"><div class="eyebrow">A TRUE 3D DRIFT RACE</div><div class="logo">DRIFTING<span>DREAMS</span></div><p class="tag">Twelve real 3D cars. Full 360° camera. Weight transfer, counter-steer, tire smoke and speed you can feel.</p><div id="attractPrompt">PRESS ANY KEY, BUTTON OR TAP TO CONTINUE</div></div><button id="controlsBtn">⚙ CONTROLS &amp; MAPPING</button></section>
+  <section id="vehicleSelect" class="screen hidden"><div class="menuCard wideCard"><div class="eyebrow">STEP 1 OF 2</div><div class="logo" style="font-size:clamp(32px,4.8vw,52px)">CHOOSE YOUR<span>CAR</span></div><div class="pickRow" id="vehicleRow"></div><div class="bigBtnRow"><button class="ghostBtn" id="vehicleBack">BACK</button><button class="ctaBtn" id="vehicleNext">SELECT CAR</button></div></div></section>
+  <section id="trackSelect" class="screen hidden"><div class="menuCard wideCard"><div class="eyebrow">STEP 2 OF 2</div><div class="logo" style="font-size:clamp(32px,4.8vw,52px)">CHOOSE YOUR<span>TRACK</span></div><div class="pickRow" id="trackRow"></div><div class="bigBtnRow"><button class="ghostBtn" id="trackBack">BACK</button><button class="ctaBtn" id="trackNext">START RACE</button></div></div></section>
+  <section id="controlsScreen" class="screen hidden"><div class="menuCard wideCard settingsPanel"><div class="eyebrow">SETTINGS</div><div class="logo" style="font-size:clamp(28px,4.4vw,44px)">CONTROL<span>MAPPING</span></div><div id="gpStatus">No controller detected</div><div id="bindList"></div><div class="bigBtnRow"><button class="ghostBtn" id="bindReset">RESET TO DEFAULTS</button><button class="ctaBtn" id="bindBack">DONE</button></div></div></section>
   <div id="touch"><button id="left" class="touchBtn">‹</button><button id="right" class="touchBtn">›</button><button id="gas" class="touchBtn">GAS</button><button id="brake" class="touchBtn">BRAKE</button><button id="driftBtn" class="touchBtn">DRIFT</button><button id="camBtn" class="touchBtn">360°<br>CAM</button></div>
   <div id="rotate">ROTATE YOUR DEVICE<small>Drifting Dreams plays best in landscape</small></div>
   <script type="module">
@@ -199,7 +223,15 @@
     {const mctx=markerCanvas.getContext('2d');mctx.fillStyle='#fff';mctx.beginPath();mctx.moveTo(32,60);mctx.lineTo(6,12);mctx.lineTo(58,12);mctx.closePath();mctx.fill()}
     const markerTex=new THREE.CanvasTexture(markerCanvas);
     const markerMat=new THREE.SpriteMaterial({map:markerTex,color:0xff9a00,depthTest:false,transparent:true,sizeAttenuation:true});
-    function makeCar(i){const root=new THREE.Group(),assetIndex=i===0?0:1+(i-1)%6,racer=i===0||isRacerAsset(assetIndex),model=cloneTint(carAssets[assetIndex],i>=7?colors[i]:null);model.scale.setScalar(CAR_SCALE);root.add(model);scene.add(root);const nodes=[];model.traverse(n=>{if(/wheel/i.test(n.name)&&n.isMesh)nodes.push(n)});const wheels=nodes.map(n=>{const parent=n.parent,pivot=new THREE.Group();pivot.name=n.name+'_steerPivot';parent.add(pivot);pivot.position.copy(n.position);parent.remove(n);pivot.add(n);n.position.set(0,0,0);return{pivot,mesh:n,front:/front/i.test(n.name),baseQ:n.quaternion.clone(),spin:0}});const box=new THREE.Box3().setFromObject(model),groundLift=-box.min.y+.02;
+    // Pulled out of makeCar so the player's visual model can be rebuilt live when they
+    // pick a different car on the vehicle-select screen, without touching the physics
+    // car object (position/heading/etc.) or re-running any of makeCar's one-time setup.
+    function buildCarVisual(root,assetIndex,tintColor){
+      while(root.children.length)root.remove(root.children[0]);
+      const model=cloneTint(carAssets[assetIndex],tintColor);model.scale.setScalar(CAR_SCALE);root.add(model);
+      const nodes=[];model.traverse(n=>{if(/wheel/i.test(n.name)&&n.isMesh)nodes.push(n)});
+      const wheels=nodes.map(n=>{const parent=n.parent,pivot=new THREE.Group();pivot.name=n.name+'_steerPivot';parent.add(pivot);pivot.position.copy(n.position);parent.remove(n);pivot.add(n);n.position.set(0,0,0);return{pivot,mesh:n,front:/front/i.test(n.name),baseQ:n.quaternion.clone(),spin:0}});
+      const box=new THREE.Box3().setFromObject(model),groundLift=-box.min.y+.02;
       let sirenLights=null;
       if(assetIndex===2){ // Cop model - mount an alternating red/blue light bar on the roof
         const barW=(box.max.x-box.min.x)*.55,barY=box.max.y+.08,barZ=(box.min.z+box.max.z)/2-(box.max.z-box.min.z)*.12;
@@ -213,8 +245,15 @@
         root.add(redLight,blueLight);
         sirenLights={redMat,blueMat,redLight,blueLight};
       }
-      if(racer&&i>0){const marker=new THREE.Sprite(markerMat);marker.scale.set(1.3,1.3,1.3);marker.position.set(0,box.max.y+1.3,0);root.add(marker)}
-      const st=spawnTransform(i);const c={root,model,wheels,groundLift,sirenLights,racer,position:st.position,heading:st.heading,moveHeading:st.heading,speed:0,steer:0,_lastIdx:null,lapDist:0,progress:0,lap:1,ai:i>0,base:i===0?58:TYPE_BASE_SPEED[assetIndex]+(i%3)*2.2,seed:i*7.31};cars.push(c);return c}
+      return{model,wheels,groundLift,sirenLights,box};
+    }
+    function makeCar(i){const root=new THREE.Group();scene.add(root);const assetIndex=i===0?0:1+(i-1)%6,racer=i===0||isRacerAsset(assetIndex);
+      const visual=buildCarVisual(root,assetIndex,i>=7?colors[i]:null);
+      if(racer&&i>0){const marker=new THREE.Sprite(markerMat);marker.scale.set(1.3,1.3,1.3);marker.position.set(0,visual.box.max.y+1.3,0);root.add(marker)}
+      const st=spawnTransform(i);const c={root,model:visual.model,wheels:visual.wheels,groundLift:visual.groundLift,sirenLights:visual.sirenLights,racer,assetIndex,position:st.position,heading:st.heading,moveHeading:st.heading,speed:0,steer:0,_lastIdx:null,lapDist:0,progress:0,lap:1,ai:i>0,base:i===0?58:TYPE_BASE_SPEED[assetIndex]+(i%3)*2.2,laneOffset:((i%3)-1)*4.5,seed:i*7.31};cars.push(c);return c}
+    // Re-skins the player's car in place (position/physics untouched) - used by the
+    // vehicle-select screen so cycling through cars updates the live 3D preview.
+    function setPlayerVehicle(assetIndex){const visual=buildCarVisual(player.root,assetIndex,null);player.model=visual.model;player.wheels=visual.wheels;player.groundLift=visual.groundLift;player.sirenLights=visual.sirenLights;player.assetIndex=assetIndex;player.rollVisual=0}
     for(let i=0;i<12;i++)makeCar(i);const player=cars[0];
     function placeCar(c,dt=0){const driftAngle=angDelta(c.moveHeading,c.heading);c.root.position.set(c.position.x,c.position.y+c.groundLift,c.position.z);c.root.rotation.order='YXZ';c.root.rotation.y=c.heading;
       // Body roll/pitch are SMOOTHED toward their target (not snapped instantly) and
@@ -238,18 +277,108 @@
     function puff(pos,scale=1){let s=smokes.find(x=>!x.visible);if(!s){s=new THREE.Sprite(smokeMat.clone());scene.add(s);smokes.push(s)}s.visible=true;s.position.copy(pos);s.position.y+=.25;s.userData.rot=(Math.random()-.5)*1.4;s.material.rotation=s.userData.rot;s.scale.setScalar(scale*1.3);s.userData.life=1;s.material.opacity=.5}
     function updateSmoke(dt){for(const s of smokes)if(s.visible){s.userData.life-=dt*.72;s.position.y+=dt*.9;s.userData.rot+=dt*.6;s.material.rotation=s.userData.rot;s.scale.addScalar(dt*1.7);s.material.opacity=Math.max(0,s.userData.life*.45);if(s.userData.life<=0)s.visible=false}}
 
-    const input={left:false,right:false,gas:false,brake:false,drift:false,nitro:false};const keyMap={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'gas',KeyW:'gas',ArrowDown:'brake',KeyS:'brake',Space:'drift',ShiftLeft:'nitro',ShiftRight:'nitro'};
-    addEventListener('keydown',e=>{if(keyMap[e.code]){input[keyMap[e.code]]=true;e.preventDefault()}if(e.code==='KeyC')cycleCamera();if(e.code==='KeyQ')orbitYaw-=.18;if(e.code==='KeyE')orbitYaw+=.18;if(e.code==='Escape')togglePause()});addEventListener('keyup',e=>{if(keyMap[e.code])input[keyMap[e.code]]=false});
+    // Input is unified from three sources - keyboard, on-screen touch buttons, and an
+    // optional gamepad - each writing to its OWN held-state object so one source can
+    // never clobber another (e.g. a gamepad poll finding its button up must not stomp a
+    // key still physically held down). The three are OR-combined into `input` every
+    // frame in tick(). Bindings are user-remappable and persisted to localStorage so a
+    // rebind survives a reload; ACTIONS drives both the physics/camera code and the
+    // Controls screen's list, so adding a new bindable action only means adding it here.
+    const ACTIONS=[
+      {id:'left',label:'Steer Left'},{id:'right',label:'Steer Right'},
+      {id:'gas',label:'Accelerate'},{id:'brake',label:'Brake / Reverse'},
+      {id:'drift',label:'Handbrake Drift'},{id:'nitro',label:'Nitro Boost'},
+      {id:'camera',label:'Cycle Camera'},{id:'pause',label:'Pause'}
+    ];
+    const HELD_ACTIONS=['left','right','gas','brake','drift','nitro'];
+    const KEY_ALT={left:['ArrowLeft'],right:['ArrowRight'],gas:['ArrowUp'],brake:['ArrowDown']}; // always-on extras alongside the remappable key, so existing muscle memory never breaks
+    const DEFAULT_KEYBINDS={left:'KeyA',right:'KeyD',gas:'KeyW',brake:'KeyS',drift:'Space',nitro:'ShiftLeft',camera:'KeyC',pause:'Escape'};
+    const DEFAULT_GPBINDS={left:{t:'axis',i:0,d:-1},right:{t:'axis',i:0,d:1},gas:{t:'button',i:7},brake:{t:'button',i:6},drift:{t:'button',i:0},nitro:{t:'button',i:1},camera:{t:'button',i:3},pause:{t:'button',i:9}};
+    const GP_BUTTON_NAMES=['Cross','Circle','Square','Triangle','L1','R1','L2','R2','Share','Options','L3','R3','D-Up','D-Down','D-Left','D-Right','PS'];
+    function loadJSON(key,fallback){try{const raw=localStorage.getItem(key);if(!raw)return{...fallback};return{...fallback,...JSON.parse(raw)}}catch(e){return{...fallback}}}
+    let KEYBINDS=loadJSON('dd_keybinds',DEFAULT_KEYBINDS),GPBINDS=loadJSON('dd_gpbinds',DEFAULT_GPBINDS);
+    function saveBinds(){try{localStorage.setItem('dd_keybinds',JSON.stringify(KEYBINDS));localStorage.setItem('dd_gpbinds',JSON.stringify(GPBINDS))}catch(e){}}
+    function keyLabel(code){if(!code)return '-';if(code.startsWith('Key'))return code.slice(3);if(code.startsWith('Arrow'))return code.slice(5).toUpperCase();if(code.startsWith('Digit'))return code.slice(5);return({Space:'SPACE',ShiftLeft:'L-SHIFT',ShiftRight:'R-SHIFT',ControlLeft:'L-CTRL',ControlRight:'R-CTRL',Escape:'ESC',Enter:'ENTER'})[code]||code}
+    function gpLabel(bind){if(!bind)return '-';if(bind.t==='axis')return 'Stick '+(bind.i===0?'X':bind.i===1?'Y':bind.i)+(bind.d<0?' -':' +');return GP_BUTTON_NAMES[bind.i]||('Btn '+bind.i)}
+    // steerAxis/throttleAxis/brakeAxis stay null unless a gamepad is actively supplying
+    // analog values, so the physics can prefer smooth stick/trigger input when present
+    // and fall back to the plain digital -1/0/1 derived from the booleans otherwise -
+    // keyboard and touch behavior is completely unchanged.
+    const input={left:false,right:false,gas:false,brake:false,drift:false,nitro:false,steerAxis:null,throttleAxis:null,brakeAxis:null};
+    const keyHeld={},padHeld={},touchHeld={};
+    let listeningFor=null; // {action,kind:'key'|'gp'} while a bind row is armed waiting to capture input, else null
+    function keyToAction(code){for(const a of ACTIONS)if(KEYBINDS[a.id]===code)return a.id;for(const k in KEY_ALT)if(KEY_ALT[k].includes(code))return k;return null}
+    addEventListener('keydown',e=>{
+      if(listeningFor&&listeningFor.kind==='key'){if(e.code!=='Escape'){KEYBINDS[listeningFor.action]=e.code;saveBinds()}renderBindList();listeningFor=null;e.preventDefault();return}
+      if(listeningFor)return; // armed for a gamepad capture - ignore keyboard entirely
+      if(mode==='attract'){advanceFromAttract();return}
+      if(mode==='vehicleSelect'){if(e.code==='ArrowLeft'||e.code==='KeyA')cycleVehiclePick(-1);else if(e.code==='ArrowRight'||e.code==='KeyD')cycleVehiclePick(1);else if(e.code==='Enter'||e.code==='Space')confirmVehicle();return}
+      if(mode==='trackSelect'){if(e.code==='ArrowLeft'||e.code==='KeyA')cycleTrackPick(-1);else if(e.code==='ArrowRight'||e.code==='KeyD')cycleTrackPick(1);else if(e.code==='Enter'||e.code==='Space')confirmTrack();return}
+      const action=keyToAction(e.code);
+      if(action&&HELD_ACTIONS.includes(action)){keyHeld[action]=true;e.preventDefault()}
+      if(action==='camera')cycleCamera();
+      if(action==='pause')togglePause();
+      if(e.code==='KeyQ')orbitYaw-=.18;if(e.code==='KeyE')orbitYaw+=.18;
+    });
+    addEventListener('keyup',e=>{const action=keyToAction(e.code);if(action)keyHeld[action]=false});
     let paused=false;
     function togglePause(){if(mode!=='race'&&mode!=='countdown')return;paused=!paused;$('banner').textContent=paused?'PAUSED':(mode==='countdown'?Math.ceil(countdown)>0?String(Math.ceil(countdown)):'GO!':'');$('banner').classList.toggle('show',paused)}
-    for(const [id,k] of [['left','left'],['right','right'],['gas','gas'],['brake','brake'],['driftBtn','drift']]){const b=$(id);const set=v=>{input[k]=v;b.classList.toggle('on',v)};b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);set(true)});b.addEventListener('pointerup',()=>set(false));b.addEventListener('pointercancel',()=>set(false))}
+    for(const [id,k] of [['left','left'],['right','right'],['gas','gas'],['brake','brake'],['driftBtn','drift']]){const b=$(id);const set=v=>{touchHeld[k]=v;b.classList.toggle('on',v)};b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);set(true)});b.addEventListener('pointerup',()=>set(false));b.addEventListener('pointercancel',()=>set(false))}
+    // Gamepad: no connect/disconnect event fires reliably for a controller already on
+    // when the page loads (notably Bluetooth pads need a button press to wake up), so
+    // pollGamepad() below re-scans navigator.getGamepads() every frame rather than
+    // relying solely on the gamepadconnected event - that event just updates the label.
+    let gpIndex=null;
+    addEventListener('gamepadconnected',e=>{gpIndex=e.gamepad.index;const el=$('gpStatus');if(el)el.textContent='Connected: '+e.gamepad.id});
+    addEventListener('gamepaddisconnected',e=>{if(e.gamepad.index===gpIndex){gpIndex=null;const el=$('gpStatus');if(el)el.textContent='No controller detected'}});
+    function gpAxisOrButtonValue(gp,bind){if(!bind)return 0;if(bind.t==='button'){const b=gp.buttons[bind.i];return b?b.value:0}const v=gp.axes[bind.i]||0;return bind.d<0?Math.max(0,-v):Math.max(0,v)}
+    function gpPressed(gp,bind){if(!bind)return false;if(bind.t==='button')return!!(gp.buttons[bind.i]&&gp.buttons[bind.i].pressed);const v=gp.axes[bind.i]||0;return bind.d<0?v<-.5:v>.5}
+    let gpPrevPressed={};
+    function pollGamepad(){
+      const pads=navigator.getGamepads?navigator.getGamepads():[];
+      let gp=gpIndex!=null?pads[gpIndex]:null;
+      if(!gp)for(const p of pads)if(p){gp=p;gpIndex=p.index;break}
+      if(!gp){input.steerAxis=null;input.throttleAxis=null;input.brakeAxis=null;for(const a of HELD_ACTIONS)padHeld[a]=false;return}
+      const DEAD=.16,lv=gpAxisOrButtonValue(gp,GPBINDS.left),rv=gpAxisOrButtonValue(gp,GPBINDS.right);
+      let steer=lv-rv;steer=Math.abs(steer)<DEAD?0:Math.sign(steer)*(Math.abs(steer)-DEAD)/(1-DEAD);
+      input.steerAxis=steer;input.throttleAxis=gpAxisOrButtonValue(gp,GPBINDS.gas);input.brakeAxis=gpAxisOrButtonValue(gp,GPBINDS.brake);
+      padHeld.left=gpPressed(gp,GPBINDS.left);padHeld.right=gpPressed(gp,GPBINDS.right);
+      padHeld.gas=input.throttleAxis>.08;padHeld.brake=input.brakeAxis>.08;
+      padHeld.drift=gpPressed(gp,GPBINDS.drift);padHeld.nitro=gpPressed(gp,GPBINDS.nitro);
+      const cameraNow=gpPressed(gp,GPBINDS.camera),pauseNow=gpPressed(gp,GPBINDS.pause);
+      if(cameraNow&&!gpPrevPressed.camera)cycleCamera();
+      if(pauseNow&&!gpPrevPressed.pause)togglePause();
+      if(listeningFor&&listeningFor.kind==='gp'){
+        for(let i=0;i<gp.buttons.length;i++){if(gp.buttons[i].pressed&&!(gpPrevPressed.buttons&&gpPrevPressed.buttons[i])){GPBINDS[listeningFor.action]={t:'button',i};saveBinds();renderBindList();listeningFor=null;break}}
+      }
+      if((mode==='attract')){
+        for(let i=0;i<gp.buttons.length;i++)if(gp.buttons[i].pressed&&!(gpPrevPressed.buttons&&gpPrevPressed.buttons[i])){advanceFromAttract();break}
+      }else if(mode==='vehicleSelect'||mode==='trackSelect'){
+        const dpadL=gp.buttons[14]&&gp.buttons[14].pressed,dpadR=gp.buttons[15]&&gp.buttons[15].pressed,stickL=gp.axes[0]<-.6,stickR=gp.axes[0]>.6,confirm=gp.buttons[0]&&gp.buttons[0].pressed;
+        const prevL=gpPrevPressed.navL,prevR=gpPrevPressed.navR,prevConfirm=gpPrevPressed.confirm;
+        const goL=(dpadL||stickL)&&!prevL,goR=(dpadR||stickR)&&!prevR;
+        if(mode==='vehicleSelect'){if(goL)cycleVehiclePick(-1);if(goR)cycleVehiclePick(1);if(confirm&&!prevConfirm)confirmVehicle()}
+        else{if(goL)cycleTrackPick(-1);if(goR)cycleTrackPick(1);if(confirm&&!prevConfirm)confirmTrack()}
+        gpPrevPressed.navL=dpadL||stickL;gpPrevPressed.navR=dpadR||stickR;gpPrevPressed.confirm=confirm;
+      }
+      gpPrevPressed.camera=cameraNow;gpPrevPressed.pause=pauseNow;
+      gpPrevPressed.buttons=gp.buttons.map(b=>b.pressed);
+    }
     let camMode=0,orbitYaw=0,orbitPitch=.22,dragging=false,lastX=0,lastY=0;
     const camNames=['CHASE','HOOD','360° ORBIT'];function cycleCamera(){camMode=(camMode+1)%3;$('camLabel').textContent='CAM: '+camNames[camMode]+' · DRAG TO ORBIT'}$('camBtn').onclick=cycleCamera;
     canvas.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;orbitYaw-=dx*.008;orbitPitch=THREE.MathUtils.clamp(orbitPitch+dy*.005,-.12,.75);camMode=2;lastX=e.clientX;lastY=e.clientY;$('camLabel').textContent='CAM: 360° ORBIT · DRAG TO LOOK'});canvas.addEventListener('pointerup',()=>dragging=false);canvas.addEventListener('pointercancel',()=>dragging=false);
 
-    let mode='menu',raceTime=0,countdown=3.7,nitro=1,driftScore=0,totalScore=0,lastPuff=0;
+    let mode='attract',raceTime=0,countdown=3.7,nitro=1,driftScore=0,totalScore=0,lastPuff=0;
     cars.forEach(c=>placeCar(c));
-    function updatePlayer(dt){const steerTarget=(input.left?1:0)-(input.right?1:0);player.steer=THREE.MathUtils.lerp(player.steer,steerTarget,1-Math.exp(-dt*13));const boost=input.nitro&&nitro>0&&player.speed>12;if(boost)nitro=Math.max(0,nitro-dt*.24);const top=boost?72:54,accel=input.gas?(boost?23:17):0,brake=input.brake?30:0;player.speed+=accel*dt-brake*dt;player.speed-=dt*(1.05+player.speed*.01);player.speed=THREE.MathUtils.clamp(player.speed,input.brake&&!input.gas?-8:0,top);
+    function updatePlayer(dt){
+      // Prefer the gamepad's analog stick/triggers when one is connected and in use -
+      // smooth continuous steering and throttle feel much better for drifting than the
+      // plain digital -1/0/1 keyboard/touch give. Both paths feed the exact same
+      // downstream physics (steerTarget, gasAmt, brakeAmt), so nothing else changes.
+      const steerTarget=input.steerAxis!=null?input.steerAxis:(input.left?1:0)-(input.right?1:0);
+      const gasAmt=input.throttleAxis!=null&&input.throttleAxis>.02?input.throttleAxis:(input.gas?1:0);
+      const brakeAmt=input.brakeAxis!=null&&input.brakeAxis>.02?input.brakeAxis:(input.brake?1:0);
+      player.steer=THREE.MathUtils.lerp(player.steer,steerTarget,1-Math.exp(-dt*13));const boost=input.nitro&&nitro>0&&player.speed>12;if(boost)nitro=Math.max(0,nitro-dt*.24);const top=boost?72:54,accel=gasAmt*(boost?23:17),brake=brakeAmt*30;player.speed+=accel*dt-brake*dt;player.speed-=dt*(1.05+player.speed*.01);player.speed=THREE.MathUtils.clamp(player.speed,brakeAmt>0&&gasAmt<=0?-8:0,top);
       // Real heading physics: steer only changes which way the car is POINTED (yaw).
       // moveHeading (actual travel direction) chases heading at a grip-dependent rate -
       // fairly quick normally but no longer near-instant, so committing hard to a turn
@@ -307,7 +436,12 @@
       }
       if(sliding){const pts=Math.round(driftMag*speedAbs*7.5);driftScore+=pts;totalScore+=pts;lastPuff-=dt;if(lastPuff<=0){const puffScale=1.1+Math.min(1,driftMag)*.9,hs=Math.sin(player.heading),hc=Math.cos(player.heading),bx=-hs*1.65,bz=-hc*1.65,sx=hc*.78,sz=-hs*.78;puff(vA.set(player.position.x+bx-sx,player.position.y+.3,player.position.z+bz-sz),puffScale);puff(vB.set(player.position.x+bx+sx,player.position.y+.3,player.position.z+bz+sz),puffScale);lastPuff=.026}}else{driftScore=0}
       placeCar(player,dt)}
-    function updateAI(dt){for(let i=1;i<cars.length;i++){const c=cars[i],info=nearestSample(c.position,c._sampleHint);c._sampleHint=info.index;const lookAhead=9+Math.abs(c.speed)*.35,preferredLane=((i%3)-1)*4.5+Math.sin(raceTime*.15+c.seed)*1.1,tp=pointAtArc(info.arc+lookAhead,preferredLane),dx=tp.x-c.position.x,dz=tp.z-c.position.z,desiredHeading=Math.atan2(dx,dz),err=angDelta(c.heading,desiredHeading);c.position.y=THREE.MathUtils.lerp(c.position.y,info.y,1-Math.exp(-dt*22));c.steer=THREE.MathUtils.clamp(err*2.4,-1,1);const target=c.base+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.0*speedFactor*dt;c.moveHeading=angDamp(c.moveHeading,c.heading,13,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}updateLapProgress(c,info);placeCar(c,dt)}}
+    // Pulled out of updateAI's loop body so the attract-mode demo can drive EVERY car
+    // (including the one that becomes the player) with the exact same logic, instead of
+    // needing a second, drifting-out-of-sync copy of the AI behavior.
+    function driveAI(c,dt){const info=nearestSample(c.position,c._sampleHint);c._sampleHint=info.index;const lookAhead=9+Math.abs(c.speed)*.35,preferredLane=c.laneOffset+Math.sin(raceTime*.15+c.seed)*1.1,tp=pointAtArc(info.arc+lookAhead,preferredLane),dx=tp.x-c.position.x,dz=tp.z-c.position.z,desiredHeading=Math.atan2(dx,dz),err=angDelta(c.heading,desiredHeading);c.position.y=THREE.MathUtils.lerp(c.position.y,info.y,1-Math.exp(-dt*22));c.steer=THREE.MathUtils.clamp(err*2.4,-1,1);const target=c.base+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.0*speedFactor*dt;c.moveHeading=angDamp(c.moveHeading,c.heading,13,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}updateLapProgress(c,info);placeCar(c,dt)}
+    function updateAI(dt){for(let i=1;i<cars.length;i++)driveAI(cars[i],dt)}
+    function updateAttractDrive(dt){for(let i=0;i<cars.length;i++)driveAI(cars[i],dt)}
     function collisions(){for(let i=1;i<cars.length;i++){const c=cars[i],dx=c.position.x-player.position.x,dz=c.position.z-player.position.z,dist=Math.hypot(dx,dz);if(dist<3.2&&dist>.001){const nx=dx/dist,nz=dz/dist;player.speed*=.93;player.position.x-=nx*.12;player.position.z-=nz*.12;c.position.x+=nx*.12;c.position.z+=nz*.12}}}
     const camTarget=new THREE.Vector3(),camDesired=new THREE.Vector3(),look=new THREE.Vector3();
     function updateCamera(dt){const hs=Math.sin(player.heading),hc=Math.cos(player.heading),tx=hs,tz=hc,sx=-hc,sz=hs,speedAbs=Math.abs(player.speed);camTarget.set(player.position.x,player.position.y+1.15,player.position.z);let distance=11.5+Math.min(speedAbs,90)*.045,height=4.6,yaw=orbitYaw;if(camMode===1){camDesired.set(player.position.x+tx*1.1,player.position.y+1.22,player.position.z+tz*1.1);look.set(player.position.x+tx*18,player.position.y+.7,player.position.z+tz*18)}else{if(camMode===0&&!dragging){yaw=THREE.MathUtils.lerp(yaw,0,1-Math.exp(-dt*4));orbitYaw=yaw;orbitPitch=THREE.MathUtils.lerp(orbitPitch,.2,dt*2)}if(camMode===2){distance=12.5;height=2.4+Math.sin(orbitPitch)*7}const behindScale=-Math.cos(yaw)*distance,acrossScale=Math.sin(yaw)*distance;camDesired.set(camTarget.x+tx*behindScale+sx*acrossScale,camTarget.y+height,camTarget.z+tz*behindScale+sz*acrossScale);look.copy(camTarget)}
@@ -379,9 +513,75 @@
     function updateHUD(){const mph=Math.round(Math.abs(player.speed)*2.23694),gear=mph<2?'N':Math.min(6,Math.max(1,Math.ceil(mph/27))),racerCount=cars.filter(c=>c.racer).length,ahead=cars.filter((c,i)=>i&&c.racer&&c.progress>player.progress).length;$('speed').textContent=mph;$('gear').textContent=gear;$('time').textContent=formatTime(raceTime);$('lap').textContent='LAP '+player.lap+'/3';$('position').innerHTML=(ahead+1)+'<span>/'+racerCount+'</span>';$('driftScore').textContent=driftScore;$('nitroFill').style.height=(nitro*94)+'%';drawSpeedGauge(mph,input.nitro&&nitro>0);drawMap();
       $('debugReadout').textContent='L:'+(input.left?1:0)+' R:'+(input.right?1:0)+' steer:'+player.steer.toFixed(2)+' heading:'+(player.heading*180/Math.PI%360).toFixed(0)+'° cam:'+camMode+' yaw:'+(orbitYaw*180/Math.PI).toFixed(0)+'°';
     }
-    function resetRace(){raceTime=0;countdown=3.7;nitro=1;driftScore=totalScore=0;camMode=0;orbitYaw=0;orbitPitch=.22;dragging=false;$('camLabel').textContent='CAM: CHASE · DRAG TO ORBIT';cars.forEach((c,i)=>{const st=spawnTransform(i);c.position.copy(st.position);c.heading=st.heading;c.moveHeading=st.heading;c.speed=0;c.steer=0;c._lastIdx=null;c._sampleHint=null;c.lapDist=0;c.progress=0;c.lap=1;placeCar(c)});mode='countdown';$('hud').classList.add('on');$('menu').classList.add('hidden')}
-    $('start').onclick=resetRace;
-    function tick(){requestAnimationFrame(tick);let dt=Math.min(clock.getDelta(),.033);if(paused){composer.render();return}if(mode==='menu'){orbitYaw+=dt*.18;placeCar(player,dt);updateCamera(dt)}else if(mode==='countdown'){countdown-=dt;const n=Math.ceil(countdown);$('banner').textContent=n>0?n:'GO!';$('banner').classList.add('show');if(countdown<=0){mode='race';setTimeout(()=>{if(!paused)$('banner').classList.remove('show')},650)}updateCamera(dt);updateHUD()}else{raceTime+=dt;updatePlayer(dt);updateAI(dt);collisions();updateSmoke(dt);updateCamera(dt);updateHUD()}composer.render()}
+    function resetRace(){raceTime=0;countdown=3.7;nitro=1;driftScore=totalScore=0;camMode=0;orbitYaw=0;orbitPitch=.22;dragging=false;$('camLabel').textContent='CAM: CHASE · DRAG TO ORBIT';cars.forEach((c,i)=>{const st=spawnTransform(i);c.position.copy(st.position);c.heading=st.heading;c.moveHeading=st.heading;c.speed=0;c.steer=0;c._lastIdx=null;c._sampleHint=null;c.lapDist=0;c.progress=0;c.lap=1;placeCar(c)});mode='countdown';$('hud').classList.add('on');showScreen(null)}
+
+    // --- Screen flow: attract (title + cinematic demo loop) -> vehicle select ->
+    // track select -> countdown -> race. Every screen is a plain <section class="screen">
+    // toggled via showScreen(); only one is ever visible (or none, during the race itself).
+    function showScreen(id){document.querySelectorAll('.screen').forEach(el=>el.classList.add('hidden'));if(id)$(id).classList.remove('hidden')}
+    const VEHICLES=[
+      {assetIndex:0,name:'Apex GT',tag:'Balanced sports coupe'},
+      {assetIndex:1,name:'Velocity S2',tag:'Lightweight sports car'},
+      {assetIndex:2,name:'Interceptor',tag:'Police-tuned pursuit'},
+      {assetIndex:3,name:'City Cab',tag:'Taxi'},
+      {assetIndex:4,name:'Trailblazer',tag:'SUV'},
+      {assetIndex:5,name:'Commuter',tag:'Compact'},
+      {assetIndex:6,name:'Sedan LX',tag:'Sedan'}
+    ];
+    const TRACKS=[{name:'Neon City Circuit',desc:'14-corner cyberpunk loop, 3 laps'}]; // one today; renderTrackRow/TRACKS is the only place to touch to add more
+    let vehiclePickIndex=0,trackPickIndex=0;
+    const SHOWCASE_POS=new THREE.Vector3(0,-4.3,280); // on the ground plane (y=-4.5), well clear of the actual track/buildings, used to preview cars/track menus
+    function getLeader(){let best=cars[0],bp=-1;for(const c of cars)if(c.racer&&c.progress>bp){bp=c.progress;best=c}return best}
+    function advanceFromAttract(){if(mode!=='attract')return;mode='vehicleSelect';showScreen('vehicleSelect');player.position.copy(SHOWCASE_POS);player.heading=0;player.moveHeading=0;player.speed=0;setPlayerVehicle(VEHICLES[vehiclePickIndex].assetIndex);renderVehicleRow()}
+    function renderVehicleRow(){const row=$('vehicleRow');row.innerHTML='';VEHICLES.forEach((v,idx)=>{const card=document.createElement('div');card.className='pickCard'+(idx===vehiclePickIndex?' active':'');card.innerHTML='<b>'+v.name+'</b><small>'+v.tag+'</small>';card.onclick=()=>{vehiclePickIndex=idx;setPlayerVehicle(v.assetIndex);renderVehicleRow()};row.appendChild(card)})}
+    function cycleVehiclePick(dir){vehiclePickIndex=(vehiclePickIndex+dir+VEHICLES.length)%VEHICLES.length;setPlayerVehicle(VEHICLES[vehiclePickIndex].assetIndex);renderVehicleRow()}
+    function confirmVehicle(){mode='trackSelect';showScreen('trackSelect');renderTrackRow()}
+    function renderTrackRow(){const row=$('trackRow');row.innerHTML='';TRACKS.forEach((t,idx)=>{const card=document.createElement('div');card.className='pickCard'+(idx===trackPickIndex?' active':'');card.innerHTML='<b>'+t.name+'</b><small>'+t.desc+'</small>';card.onclick=()=>{trackPickIndex=idx;renderTrackRow()};row.appendChild(card)})}
+    function cycleTrackPick(dir){trackPickIndex=(trackPickIndex+dir+TRACKS.length)%TRACKS.length;renderTrackRow()}
+    function confirmTrack(){resetRace()}
+    $('vehicleNext').onclick=confirmVehicle;$('vehicleBack').onclick=()=>{mode='attract';showScreen('attract')};
+    $('trackNext').onclick=confirmTrack;$('trackBack').onclick=()=>{mode='vehicleSelect';showScreen('vehicleSelect');renderVehicleRow()};
+    $('controlsBtn').onclick=()=>{mode='controls';showScreen('controlsScreen');renderBindList()};
+    $('bindBack').onclick=()=>{listeningFor=null;mode='attract';showScreen('attract')};
+    $('bindReset').onclick=()=>{KEYBINDS={...DEFAULT_KEYBINDS};GPBINDS=JSON.parse(JSON.stringify(DEFAULT_GPBINDS));saveBinds();renderBindList()};
+    function renderBindList(){const list=$('bindList');list.innerHTML='';const head=document.createElement('div');head.className='bindRow';head.innerHTML='<span class="bindHead">ACTION</span><span class="bindHead">KEYBOARD</span><span class="bindHead">GAMEPAD</span>';list.appendChild(head);
+      ACTIONS.forEach(a=>{const row=document.createElement('div');row.className='bindRow';row.innerHTML='<b>'+a.label+'</b>';
+        const kBtn=document.createElement('button');const kListening=listeningFor&&listeningFor.kind==='key'&&listeningFor.action===a.id;kBtn.className='bindKey'+(kListening?' listening':'');kBtn.textContent=kListening?'PRESS A KEY…':keyLabel(KEYBINDS[a.id]);kBtn.onclick=()=>{listeningFor={action:a.id,kind:'key'};renderBindList()};
+        const gBtn=document.createElement('button');const gListening=listeningFor&&listeningFor.kind==='gp'&&listeningFor.action===a.id;gBtn.className='bindKey'+(gListening?' listening':'');gBtn.textContent=gListening?'PRESS A BUTTON…':gpLabel(GPBINDS[a.id]);gBtn.onclick=()=>{listeningFor={action:a.id,kind:'gp'};renderBindList()};
+        row.appendChild(kBtn);row.appendChild(gBtn);list.appendChild(row)})}
+    document.addEventListener('pointerdown',e=>{if(mode!=='attract')return;if(e.target.closest('#controlsBtn'))return;advanceFromAttract()});
+
+    // Cinematic attract-mode camera: cuts between a few movie-style shots of whichever
+    // racer is currently leading the demo lap, instead of a single static menu backdrop.
+    let attractShot=0,attractTimer=0;const attractPick={pos:new THREE.Vector3(),look:new THREE.Vector3()};
+    function updateAttractCamera(dt){
+      attractTimer-=dt;
+      if(attractTimer<=0){attractShot=(attractShot+1)%4;attractTimer=5+Math.random()*2.5;
+        if(attractShot===1){const s=SAMPLES[Math.floor(Math.random()*SAMPLE_N)];attractPick.pos.set(s.p.x+s.side.x*(TRACK_W+9),s.p.y+3,s.p.z+s.side.z*(TRACK_W+9))}
+        if(attractShot===3){const s=SAMPLES[Math.floor(Math.random()*SAMPLE_N)];attractPick.pos.set(s.p.x-s.side.x*50,s.p.y+36,s.p.z-s.side.z*50)}
+      }
+      const leader=getLeader();
+      if(attractShot===0){const hs=Math.sin(leader.heading),hc=Math.cos(leader.heading);camDesired.set(leader.position.x-hs*13,leader.position.y+5.2,leader.position.z-hc*13);look.set(leader.position.x,leader.position.y+1.2,leader.position.z)}
+      else if(attractShot===1){camDesired.copy(attractPick.pos);look.set(leader.position.x,leader.position.y+1,leader.position.z)}
+      else if(attractShot===2){const ang=raceTime*.35;camDesired.set(leader.position.x+Math.cos(ang)*16,leader.position.y+7,leader.position.z+Math.sin(ang)*16);look.set(leader.position.x,leader.position.y+1,leader.position.z)}
+      else{camDesired.copy(attractPick.pos);look.set(leader.position.x,leader.position.y+2,leader.position.z)}
+      camera.position.lerp(camDesired,1-Math.exp(-dt*(attractShot===1||attractShot===3?2.2:4)));
+      camera.lookAt(look);camera.fov=THREE.MathUtils.lerp(camera.fov,60,dt*3);camera.updateProjectionMatrix();
+    }
+    // Vehicle/track select camera: a slow orbit around the player's car sitting on a
+    // showcase pedestal well off the actual track, auto-turntabling so every angle of
+    // whichever car is highlighted is visible without needing drag input.
+    function updateShowcase(dt){player.heading+=dt*.5;player.moveHeading=player.heading;placeCar(player,dt);orbitYaw+=dt*.22;
+      const dist=7.6,height=2.5;camDesired.set(player.position.x+Math.sin(orbitYaw)*dist,player.position.y+height,player.position.z+Math.cos(orbitYaw)*dist);
+      camera.position.lerp(camDesired,1-Math.exp(-dt*4));look.set(player.position.x,player.position.y+.9,player.position.z);camera.lookAt(look);
+      camera.fov=THREE.MathUtils.lerp(camera.fov,50,dt*3);camera.updateProjectionMatrix();
+    }
+    function tick(){requestAnimationFrame(tick);let dt=Math.min(clock.getDelta(),.033);pollGamepad();for(const a of HELD_ACTIONS)input[a]=keyHeld[a]||padHeld[a]||touchHeld[a];if(paused){composer.render();return}
+      if(mode==='attract'||mode==='controls'){raceTime+=dt;updateAttractDrive(dt);updateAttractCamera(dt)}
+      else if(mode==='vehicleSelect'||mode==='trackSelect'){for(let i=1;i<cars.length;i++)driveAI(cars[i],dt);updateShowcase(dt)}
+      else if(mode==='countdown'){countdown-=dt;const n=Math.ceil(countdown);$('banner').textContent=n>0?n:'GO!';$('banner').classList.add('show');if(countdown<=0){mode='race';setTimeout(()=>{if(!paused)$('banner').classList.remove('show')},650)}updateCamera(dt);updateHUD()}
+      else{raceTime+=dt;updatePlayer(dt);updateAI(dt);collisions();updateSmoke(dt);updateCamera(dt);updateHUD()}
+      composer.render()}
     tick();
     addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));composer.setSize(innerWidth,innerHeight);bloomPass.setSize(innerWidth,innerHeight)});
   </script>
