@@ -16,8 +16,9 @@
     #raceTop{position:absolute;top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;align-items:baseline;gap:18px;padding:8px 22px;border-radius:16px;font-weight:950;font-style:italic}
     #time{font-size:clamp(24px,4vw,52px);letter-spacing:2px}#lap{font-size:clamp(13px,1.7vw,23px)}
     #position{position:absolute;left:clamp(14px,3vw,44px);top:clamp(12px,4vh,45px);font-weight:1000;font-style:italic;font-size:clamp(31px,5vw,68px);color:#fff}#position span{font-size:.46em;color:var(--cyan)}
-    #speedbox{position:absolute;left:clamp(12px,3vw,44px);bottom:clamp(72px,8vh,102px);width:clamp(140px,16vw,220px);aspect-ratio:1;border:4px solid var(--cyan);border-radius:50%;display:grid;place-content:center;text-align:center;background:rgba(4,19,28,.64);box-shadow:0 0 30px rgba(36,245,239,.24),inset 0 0 36px rgba(36,245,239,.12)}
-    #speed{font-size:clamp(44px,6vw,78px);font-weight:1000;line-height:.82;color:var(--cyan)}#speedbox small{font-weight:900;font-size:clamp(12px,1.5vw,19px)}#gear{margin-top:8px;color:var(--yellow);font-size:clamp(19px,2.3vw,29px);font-weight:1000}
+    #speedbox{position:absolute;left:clamp(12px,3vw,44px);bottom:clamp(72px,8vh,102px);width:clamp(140px,16vw,220px);aspect-ratio:1;border:2px solid rgba(36,245,239,.4);border-radius:50%;display:grid;place-content:center;text-align:center;background:rgba(4,19,28,.64);box-shadow:0 0 30px rgba(36,245,239,.24),inset 0 0 36px rgba(36,245,239,.12)}
+    #speedGauge{position:absolute;inset:0;width:100%;height:100%}
+    #speed{font-size:clamp(40px,5.4vw,70px);font-weight:1000;line-height:.82;color:var(--cyan)}#speedbox small{font-weight:900;font-size:clamp(11px,1.3vw,17px);letter-spacing:.06em}#gear{margin-top:6px;color:var(--yellow);font-size:clamp(17px,2vw,25px);font-weight:1000}
     #drift{position:absolute;left:clamp(20px,4vw,65px);bottom:clamp(25px,3vh,38px);padding:8px 14px;border-radius:11px;font-weight:950;font-size:clamp(14px,1.7vw,23px)}
     #mapWrap{position:absolute;right:clamp(15px,3vw,42px);top:clamp(78px,12vh,132px);width:clamp(130px,15vw,205px);aspect-ratio:1;border-radius:50%;overflow:hidden;border:4px solid var(--cyan);background:rgba(3,18,26,.7);box-shadow:0 0 30px rgba(36,245,239,.2)}#map{width:100%;height:100%}
     #camLabel{position:absolute;right:clamp(18px,4vw,58px);bottom:clamp(100px,13vh,160px);padding:8px 14px;border-radius:11px;font-weight:900;font-size:clamp(11px,1.2vw,16px)}
@@ -38,8 +39,8 @@
   <canvas id="game"></canvas><canvas id="speedFx"></canvas><div id="vignette"></div>
   <div class="hud" id="hud">
     <div id="raceTop" class="pill"><div id="time">00:00.000</div><div id="lap">LAP 1/3</div></div>
-    <div id="position">1<span>/12</span></div>
-    <div id="speedbox"><div id="speed">0</div><small>km/h</small><div id="gear">N</div></div>
+    <div id="position">1<span>/4</span></div>
+    <div id="speedbox"><canvas id="speedGauge"></canvas><div id="speed">0</div><small>mph</small><div id="gear">N</div></div>
     <div id="drift" class="pill">DRIFT <span id="driftScore">0</span></div>
     <div id="mapWrap"><canvas id="map" width="260" height="260"></canvas></div>
     <div id="camLabel" class="pill">CAM: CHASE · DRAG TO ORBIT</div>
@@ -73,11 +74,12 @@
     const sunBarMat=new THREE.MeshBasicMaterial({color:0x160c33}); for(let i=0;i<5;i++){const bw=76-i*4,bh=2.6+i*.9,bar=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,4),sunBarMat);bar.position.set(-180,44+i*7.2,-419);scene.add(bar)}
     const grid=new THREE.Mesh(new THREE.PlaneGeometry(2000,2000,40,40),new THREE.MeshBasicMaterial({color:0xff2fd0,wireframe:true,transparent:true,opacity:.22})); grid.rotation.x=-Math.PI/2; grid.position.y=-4.4; scene.add(grid);
 
-    // A smooth, flowing loop instead of hand-placed points - built from a slowly-varying
-    // radius/elevation function swept around a full circle, so every turn is a wide sweep
-    // with no single sharp hairpin (good for sustained drifts, not technical hairpin braking).
-    const points=[[190,15,0],[202,18,80],[128,16,132],[36,10,130],[-36,5,130],[-128,4,132],[-202,9,80],[-190,15,0],[-140,18,-55],[-109,16,-112],[-48,10,-174],[48,5,-174],[109,4,-112],[140,9,-55]].map(p=>new THREE.Vector3(...p));
-    const curve=new THREE.CatmullRomCurve3(points,true,'centripetal',.45), TRACK_W=18, trackLength=curve.getLength();
+    // A rounded-rectangle circuit with real corners and one chicane, instead of either a
+    // sharp hairpin or one continuous gentle sweep - straights to build speed on, then an
+    // actual ~45-65 degree corner to commit the tail into, which is what a drift track
+    // needs (a smooth oval never demands enough direction change to want to slide).
+    const points=[[-180,6,-140],[0,8,-145],[150,10,-140],[210,9,-110],[215,7,-20],[210,5,90],[150,6,155],[60,9,175],[-20,11,150],[-70,8,175],[-150,6,150],[-210,4,90],[-215,3,-20],[-200,5,-110]].map(p=>new THREE.Vector3(...p));
+    const curve=new THREE.CatmullRomCurve3(points,true,'centripetal',.45), TRACK_W=19, trackLength=curve.getLength();
     const up=new THREE.Vector3(0,1,0), vA=new THREE.Vector3(),vB=new THREE.Vector3(),vC=new THREE.Vector3();
     function frame(u){const p=curve.getPointAt((u%1+1)%1),t=curve.getTangentAt((u%1+1)%1).normalize(),side=new THREE.Vector3().crossVectors(t,up).normalize();return{p,t,side}}
     // Real position/heading physics needs a way to project a car's actual (x,z) onto
@@ -188,7 +190,16 @@
     const cars=[], colors=[0xffc400,0xe73635,0x178cff,0x15cc87,0xa754ee,0xff6b1b,0xf1f1f1,0x222a38,0xff4fb7,0x4bdbe8,0xb4db38,0x9f694c];
     const WHEEL_AXIS=new THREE.Vector3(1,0,0),wheelQ=new THREE.Quaternion();
     const TYPE_BASE_SPEED=[0,49,41,36,39,33,34]; // by assetIndex: [player-only, SportsCar2, Cop, Taxi, SUV, NormalCar1, NormalCar2] - scaled to match the player's lower top speed
-    function makeCar(i){const root=new THREE.Group(),assetIndex=i===0?0:1+(i-1)%6,model=cloneTint(carAssets[assetIndex],i>=7?colors[i]:null);model.scale.setScalar(CAR_SCALE);root.add(model);scene.add(root);const nodes=[];model.traverse(n=>{if(/wheel/i.test(n.name)&&n.isMesh)nodes.push(n)});const wheels=nodes.map(n=>{const parent=n.parent,pivot=new THREE.Group();pivot.name=n.name+'_steerPivot';parent.add(pivot);pivot.position.copy(n.position);parent.remove(n);pivot.add(n);n.position.set(0,0,0);return{pivot,mesh:n,front:/front/i.test(n.name),baseQ:n.quaternion.clone(),spin:0}});const box=new THREE.Box3().setFromObject(model),groundLift=-box.min.y+.02;
+    // Only some AI cars are actual racing rivals (ranked, lap-counted) - the sporty and
+    // cop models. Everything else (taxi/SUV/normal cars) is ambient traffic, sharing the
+    // road but not part of the race. Without a clear marker the two were indistinguishable
+    // at a glance, so racers get a floating chevron above them and a distinct minimap dot.
+    function isRacerAsset(assetIndex){return assetIndex===1||assetIndex===2}
+    const markerCanvas=document.createElement('canvas');markerCanvas.width=markerCanvas.height=64;
+    {const mctx=markerCanvas.getContext('2d');mctx.fillStyle='#fff';mctx.beginPath();mctx.moveTo(32,60);mctx.lineTo(6,12);mctx.lineTo(58,12);mctx.closePath();mctx.fill()}
+    const markerTex=new THREE.CanvasTexture(markerCanvas);
+    const markerMat=new THREE.SpriteMaterial({map:markerTex,color:0xff9a00,depthTest:false,transparent:true,sizeAttenuation:true});
+    function makeCar(i){const root=new THREE.Group(),assetIndex=i===0?0:1+(i-1)%6,racer=i===0||isRacerAsset(assetIndex),model=cloneTint(carAssets[assetIndex],i>=7?colors[i]:null);model.scale.setScalar(CAR_SCALE);root.add(model);scene.add(root);const nodes=[];model.traverse(n=>{if(/wheel/i.test(n.name)&&n.isMesh)nodes.push(n)});const wheels=nodes.map(n=>{const parent=n.parent,pivot=new THREE.Group();pivot.name=n.name+'_steerPivot';parent.add(pivot);pivot.position.copy(n.position);parent.remove(n);pivot.add(n);n.position.set(0,0,0);return{pivot,mesh:n,front:/front/i.test(n.name),baseQ:n.quaternion.clone(),spin:0}});const box=new THREE.Box3().setFromObject(model),groundLift=-box.min.y+.02;
       let sirenLights=null;
       if(assetIndex===2){ // Cop model - mount an alternating red/blue light bar on the roof
         const barW=(box.max.x-box.min.x)*.55,barY=box.max.y+.08,barZ=(box.min.z+box.max.z)/2-(box.max.z-box.min.z)*.12;
@@ -202,7 +213,8 @@
         root.add(redLight,blueLight);
         sirenLights={redMat,blueMat,redLight,blueLight};
       }
-      const st=spawnTransform(i);const c={root,model,wheels,groundLift,sirenLights,position:st.position,heading:st.heading,moveHeading:st.heading,speed:0,steer:0,_lastIdx:null,lapDist:0,progress:0,lap:1,ai:i>0,base:i===0?58:TYPE_BASE_SPEED[assetIndex]+(i%3)*2.2,seed:i*7.31};cars.push(c);return c}
+      if(racer&&i>0){const marker=new THREE.Sprite(markerMat);marker.scale.set(1.3,1.3,1.3);marker.position.set(0,box.max.y+1.3,0);root.add(marker)}
+      const st=spawnTransform(i);const c={root,model,wheels,groundLift,sirenLights,racer,position:st.position,heading:st.heading,moveHeading:st.heading,speed:0,steer:0,_lastIdx:null,lapDist:0,progress:0,lap:1,ai:i>0,base:i===0?58:TYPE_BASE_SPEED[assetIndex]+(i%3)*2.2,seed:i*7.31};cars.push(c);return c}
     for(let i=0;i<12;i++)makeCar(i);const player=cars[0];
     function placeCar(c,dt=0){const driftAngle=angDelta(c.moveHeading,c.heading);c.root.position.set(c.position.x,c.position.y+c.groundLift,c.position.z);c.root.rotation.order='YXZ';c.root.rotation.y=c.heading;
       // Body roll/pitch are SMOOTHED toward their target (not snapped instantly) and
@@ -211,7 +223,7 @@
       // made the car visibly jitter/oscillate ("rocking like a boat") whenever those
       // inputs changed quickly - which, after the steering got snappier, was constantly.
       if(c.rollVisual===undefined)c.rollVisual=0;
-      const targetRoll=THREE.MathUtils.clamp(-c.steer*.1+driftAngle*.3,-.38,.38);
+      const targetRoll=THREE.MathUtils.clamp(-c.steer*.11+driftAngle*.34,-.5,.5);
       c.rollVisual=THREE.MathUtils.lerp(c.rollVisual,targetRoll,1-Math.exp(-dt*7));
       c.root.rotation.z=c.rollVisual;
       for(const w of c.wheels){w.spin-=c.speed*dt/.47;w.mesh.quaternion.copy(w.baseQ).multiply(wheelQ.setFromAxisAngle(WHEEL_AXIS,w.spin));w.pivot.rotation.y=w.front?c.steer*.52:0}
@@ -247,8 +259,22 @@
       // moveHeading, in world space, so failing to steer through a bend sends you
       // straight off the road exactly like a real car.
       const speedAbs=Math.abs(player.speed),speedFactor=Math.max(.4,Math.min(1,speedAbs/8)),dirSign=player.speed>=0?1:-1;
-      player.heading+=player.steer*3.8*speedFactor*dirSign*dt;
-      const grip=input.drift?1.0:9;
+      player.heading+=player.steer*4.4*speedFactor*dirSign*dt;
+      // A real fishtail is a SNAP, not a gradual lean - yanking the handbrake mid-turn
+      // should whip the front away from the rear instantly (weight transfer breaking the
+      // rear tires loose all at once), not just slowly lower the grip number. Apply that
+      // as a one-time kick to heading the instant the handbrake is freshly pressed while
+      // already turning, on top of the much lower sustained grip below.
+      if(player._prevDrift===undefined)player._prevDrift=false;
+      if(input.drift&&!player._prevDrift&&speedAbs>10&&Math.abs(steerTarget)>.1)player.heading+=steerTarget*.55*dirSign;
+      player._prevDrift=input.drift;
+      // Cap how far heading can get ahead of moveHeading - without this, holding full
+      // lock through a long drift just keeps winding heading up past moveHeading forever,
+      // eventually spinning the car most of the way around (a spin-out, not a fishtail).
+      // Clamping the gap keeps the slide dramatic without ever letting it become a donut.
+      const rawGap=angDelta(player.moveHeading,player.heading),maxGap=1.35;
+      if(Math.abs(rawGap)>maxGap)player.heading=player.moveHeading+Math.sign(rawGap)*maxGap;
+      const grip=input.drift?.55:6.5;
       player.moveHeading=angDamp(player.moveHeading,player.heading,grip,dt);
       player.position.x+=Math.sin(player.moveHeading)*player.speed*dt;
       player.position.z+=Math.cos(player.moveHeading)*player.speed*dt;
@@ -306,9 +332,38 @@
     }
 
     const map=$('map'),ctx=map.getContext('2d'),mapPts=Array.from({length:130},(_,i)=>curve.getPointAt(i/130));let minX=Math.min(...mapPts.map(p=>p.x)),maxX=Math.max(...mapPts.map(p=>p.x)),minZ=Math.min(...mapPts.map(p=>p.z)),maxZ=Math.max(...mapPts.map(p=>p.z));
-    function drawMap(){const w=map.width,h=map.height,pad=28,s=Math.min((w-pad*2)/(maxX-minX),(h-pad*2)/(maxZ-minZ)),xy=p=>[w/2+(p.x-(minX+maxX)/2)*s,h/2+(p.z-(minZ+maxZ)/2)*s];ctx.clearRect(0,0,w,h);ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle='rgba(210,240,242,.9)';ctx.lineWidth=9;ctx.beginPath();mapPts.forEach((p,i)=>{const [x,y]=xy(p);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.closePath();ctx.stroke();for(let i=1;i<cars.length;i++){const [x,y]=xy(cars[i].position);ctx.fillStyle='#ff674f';ctx.beginPath();ctx.arc(x,y,3.5,0,7);ctx.fill()}const [x,y]=xy(player.position);ctx.fillStyle='#ffd31d';ctx.beginPath();ctx.arc(x,y,7,0,7);ctx.fill()}
+    // Analog-style radial gauge (270-degree sweep, gap at the bottom) replacing the plain
+    // digital-only readout - a colored arc plus needle reads speed at a glance the way a
+    // real dashboard does, and glows harder toward the top end / during nitro.
+    const gaugeCanvas=$('speedGauge'),gctx=gaugeCanvas.getContext('2d'),GAUGE_MAX_MPH=180,GAUGE_START=.75*Math.PI,GAUGE_SWEEP=1.5*Math.PI;
+    function resizeGauge(){const s=Math.round(gaugeCanvas.clientWidth*Math.min(devicePixelRatio,2));if(s>0&&gaugeCanvas.width!==s){gaugeCanvas.width=s;gaugeCanvas.height=s}}
+    resizeGauge();addEventListener('resize',resizeGauge);
+    function drawSpeedGauge(mph,boosting){
+      resizeGauge();const w=gaugeCanvas.width;if(!w)return;const cx=w/2,cy=w/2,r=w*.4;
+      gctx.clearRect(0,0,w,w);
+      const frac=THREE.MathUtils.clamp(mph/GAUGE_MAX_MPH,0,1);
+      gctx.lineCap='round';
+      gctx.lineWidth=w*.045;gctx.strokeStyle='rgba(150,220,230,.16)';
+      gctx.beginPath();gctx.arc(cx,cy,r,GAUGE_START,GAUGE_START+GAUGE_SWEEP);gctx.stroke();
+      gctx.lineWidth=w*.012;gctx.strokeStyle='rgba(200,235,240,.5)';
+      for(let i=0;i<=9;i++){const a=GAUGE_START+GAUGE_SWEEP*(i/9),r1=r-w*.055,r2=r+w*.02;
+        gctx.beginPath();gctx.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);gctx.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);gctx.stroke()}
+      if(frac>.002){
+        const grad=gctx.createLinearGradient(cx-r,cy,cx+r,cy);
+        grad.addColorStop(0,'#24f5ef');grad.addColorStop(.6,'#ffd31d');grad.addColorStop(1,'#ff4d4d');
+        gctx.lineWidth=w*.045;gctx.strokeStyle=grad;
+        gctx.shadowColor=boosting?'#ff8a00':'#24f5ef';gctx.shadowBlur=w*.08;
+        gctx.beginPath();gctx.arc(cx,cy,r,GAUGE_START,GAUGE_START+GAUGE_SWEEP*frac);gctx.stroke();
+        gctx.shadowBlur=0;
+      }
+      const na=GAUGE_START+GAUGE_SWEEP*frac;
+      gctx.strokeStyle=boosting?'#ff8a00':'#fff';gctx.lineWidth=w*.018;
+      gctx.beginPath();gctx.moveTo(cx,cy);gctx.lineTo(cx+Math.cos(na)*r*.78,cy+Math.sin(na)*r*.78);gctx.stroke();
+      gctx.fillStyle=boosting?'#ff8a00':'#fff';gctx.beginPath();gctx.arc(cx,cy,w*.028,0,7);gctx.fill();
+    }
+    function drawMap(){const w=map.width,h=map.height,pad=28,s=Math.min((w-pad*2)/(maxX-minX),(h-pad*2)/(maxZ-minZ)),xy=p=>[w/2+(p.x-(minX+maxX)/2)*s,h/2+(p.z-(minZ+maxZ)/2)*s];ctx.clearRect(0,0,w,h);ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle='rgba(210,240,242,.9)';ctx.lineWidth=9;ctx.beginPath();mapPts.forEach((p,i)=>{const [x,y]=xy(p);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.closePath();ctx.stroke();for(let i=1;i<cars.length;i++){const [x,y]=xy(cars[i].position);ctx.fillStyle=cars[i].racer?'#ff674f':'rgba(200,210,220,.4)';ctx.beginPath();ctx.arc(x,y,cars[i].racer?4:2.2,0,7);ctx.fill()}const [x,y]=xy(player.position);ctx.fillStyle='#ffd31d';ctx.beginPath();ctx.arc(x,y,7,0,7);ctx.fill()}
     function formatTime(s){const m=Math.floor(s/60),sec=Math.floor(s%60),ms=Math.floor(s%1*1000);return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')+'.'+String(ms).padStart(3,'0')}
-    function updateHUD(){const kmh=Math.round(Math.abs(player.speed)*3.6),gear=kmh<2?'N':Math.min(6,Math.max(1,Math.ceil(kmh/43))),ahead=cars.filter((c,i)=>i&&c.progress>player.progress).length;$('speed').textContent=kmh;$('gear').textContent=gear;$('time').textContent=formatTime(raceTime);$('lap').textContent='LAP '+player.lap+'/3';$('position').innerHTML=(ahead+1)+'<span>/12</span>';$('driftScore').textContent=driftScore;$('nitroFill').style.height=(nitro*94)+'%';drawMap();
+    function updateHUD(){const mph=Math.round(Math.abs(player.speed)*2.23694),gear=mph<2?'N':Math.min(6,Math.max(1,Math.ceil(mph/27))),racerCount=cars.filter(c=>c.racer).length,ahead=cars.filter((c,i)=>i&&c.racer&&c.progress>player.progress).length;$('speed').textContent=mph;$('gear').textContent=gear;$('time').textContent=formatTime(raceTime);$('lap').textContent='LAP '+player.lap+'/3';$('position').innerHTML=(ahead+1)+'<span>/'+racerCount+'</span>';$('driftScore').textContent=driftScore;$('nitroFill').style.height=(nitro*94)+'%';drawSpeedGauge(mph,input.nitro&&nitro>0);drawMap();
       $('debugReadout').textContent='L:'+(input.left?1:0)+' R:'+(input.right?1:0)+' steer:'+player.steer.toFixed(2)+' heading:'+(player.heading*180/Math.PI%360).toFixed(0)+'° cam:'+camMode+' yaw:'+(orbitYaw*180/Math.PI).toFixed(0)+'°';
     }
     function resetRace(){raceTime=0;countdown=3.7;nitro=1;driftScore=totalScore=0;camMode=0;orbitYaw=0;orbitPitch=.22;dragging=false;$('camLabel').textContent='CAM: CHASE · DRAG TO ORBIT';cars.forEach((c,i)=>{const st=spawnTransform(i);c.position.copy(st.position);c.heading=st.heading;c.moveHeading=st.heading;c.speed=0;c.steer=0;c._lastIdx=null;c._sampleHint=null;c.lapDist=0;c.progress=0;c.lap=1;placeCar(c)});mode='countdown';$('hud').classList.add('on');$('menu').classList.add('hidden')}
