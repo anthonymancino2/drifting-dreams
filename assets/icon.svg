@@ -1,0 +1,41 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg2" cx="35%" cy="30%" r="85%">
+      <stop offset="0" stop-color="#123249"/>
+      <stop offset="55%" stop-color="#07141f"/>
+      <stop offset="100%" stop-color="#030a11"/>
+    </radialGradient>
+    <linearGradient id="arcGrad" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffd31d"/>
+      <stop offset="0.55" stop-color="#ff8a2e"/>
+      <stop offset="1" stop-color="#24f5ef"/>
+    </linearGradient>
+    <linearGradient id="arcGrad2" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#24f5ef" stop-opacity="0"/>
+      <stop offset="1" stop-color="#24f5ef" stop-opacity=".9"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg2)"/>
+
+  <!-- two sweeping drift-arc skid marks, thick to thin, forming a dynamic "D" motion -->
+  <g filter="url(#glow)">
+    <path d="M 138 392 C 96 330 108 244 176 190 C 240 140 322 140 372 178"
+          fill="none" stroke="url(#arcGrad)" stroke-width="46" stroke-linecap="round"/>
+    <path d="M 372 178 C 322 140 240 140 176 190 C 108 244 96 330 138 392"
+          fill="none" stroke="#000" stroke-opacity="0" stroke-width="46"/>
+  </g>
+  <path d="M 168 358 C 140 310 150 246 202 206 C 250 168 314 168 356 198"
+        fill="none" stroke="url(#arcGrad2)" stroke-width="14" stroke-linecap="round" opacity=".8"/>
+
+  <!-- taillight spark at the tight end of the arc -->
+  <circle cx="372" cy="178" r="15" fill="#fff6d6"/>
+  <circle cx="372" cy="178" r="26" fill="#ffd31d" opacity=".35"/>
+
+  <!-- small counter-arc for depth -->
+  <path d="M 118 402 C 150 420 190 424 220 414" fill="none" stroke="#24f5ef" stroke-width="10" stroke-linecap="round" opacity=".4"/>
+</svg>
