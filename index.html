@@ -47,7 +47,7 @@
     <div id="debugReadout" style="position:absolute;left:14px;top:100px;font-size:11px;font-weight:700;background:rgba(0,0,0,.55);padding:6px 9px;border-radius:8px;line-height:1.5;font-style:normal;letter-spacing:0"></div>
     <div id="nitro"><div id="nitroFill"></div></div><div id="banner">3</div>
   </div>
-  <section id="menu"><div class="menuCard"><div class="eyebrow">A TRUE 3D DRIFT RACE</div><div class="logo">DRIFTING<span>DREAMS</span></div><p class="tag">Twelve real 3D cars. Full 360° camera. Weight transfer, counter-steer, tire smoke and speed you can feel.</p><button id="start">START ENGINE</button><div class="controls"><b class="key">W / ↑</b><span>Accelerate</span><b class="key">S / ↓</b><span>Brake / reverse</span><b class="key">A D / ← →</b><span>Steer left / right</span><b class="key">SPACE</b><span>Handbrake drift</span><b class="key">SHIFT</b><span>Nitro</span><b class="key">DRAG / Q E</b><span>Look 360° around car</span><b class="key">C</b><span>Cycle chase, hood, orbit</span></div></div></section>
+  <section id="menu"><div class="menuCard"><div class="eyebrow">A TRUE 3D DRIFT RACE</div><div class="logo">DRIFTING<span>DREAMS</span></div><p class="tag">Twelve real 3D cars. Full 360° camera. Weight transfer, counter-steer, tire smoke and speed you can feel.</p><button id="start">START ENGINE</button><div class="controls"><b class="key">W / ↑</b><span>Accelerate</span><b class="key">S / ↓</b><span>Brake / reverse</span><b class="key">A D / ← →</b><span>Steer left / right</span><b class="key">SPACE</b><span>Handbrake drift - fills your Nitro</span><b class="key">SHIFT</b><span>Nitro boost</span><b class="key">DRAG / Q E</b><span>Look 360° around car</span><b class="key">C</b><span>Cycle chase, hood, orbit</span></div></div></section>
   <div id="touch"><button id="left" class="touchBtn">‹</button><button id="right" class="touchBtn">›</button><button id="gas" class="touchBtn">GAS</button><button id="brake" class="touchBtn">BRAKE</button><button id="driftBtn" class="touchBtn">DRIFT</button><button id="camBtn" class="touchBtn">360°<br>CAM</button></div>
   <div id="rotate">ROTATE YOUR DEVICE<small>Drifting Dreams plays best in landscape</small></div>
   <script type="module">
@@ -249,7 +249,7 @@
 
     let mode='menu',raceTime=0,countdown=3.7,nitro=1,driftScore=0,totalScore=0,lastPuff=0;
     cars.forEach(c=>placeCar(c));
-    function updatePlayer(dt){const steerTarget=(input.left?1:0)-(input.right?1:0);player.steer=THREE.MathUtils.lerp(player.steer,steerTarget,1-Math.exp(-dt*13));const boost=input.nitro&&nitro>0&&player.speed>12;if(boost)nitro=Math.max(0,nitro-dt*.24);else nitro=Math.min(1,nitro+dt*.055);const top=boost?72:54,accel=input.gas?(boost?23:17):0,brake=input.brake?30:0;player.speed+=accel*dt-brake*dt;player.speed-=dt*(1.05+player.speed*.01);player.speed=THREE.MathUtils.clamp(player.speed,input.brake&&!input.gas?-8:0,top);
+    function updatePlayer(dt){const steerTarget=(input.left?1:0)-(input.right?1:0);player.steer=THREE.MathUtils.lerp(player.steer,steerTarget,1-Math.exp(-dt*13));const boost=input.nitro&&nitro>0&&player.speed>12;if(boost)nitro=Math.max(0,nitro-dt*.24);const top=boost?72:54,accel=input.gas?(boost?23:17):0,brake=input.brake?30:0;player.speed+=accel*dt-brake*dt;player.speed-=dt*(1.05+player.speed*.01);player.speed=THREE.MathUtils.clamp(player.speed,input.brake&&!input.gas?-8:0,top);
       // Real heading physics: steer only changes which way the car is POINTED (yaw).
       // moveHeading (actual travel direction) chases heading at a grip-dependent rate -
       // fairly quick normally but no longer near-instant, so committing hard to a turn
@@ -274,7 +274,11 @@
       // Clamping the gap keeps the slide dramatic without ever letting it become a donut.
       const rawGap=angDelta(player.moveHeading,player.heading),maxGap=1.35;
       if(Math.abs(rawGap)>maxGap)player.heading=player.moveHeading+Math.sign(rawGap)*maxGap;
-      const grip=input.drift?.55:6.5;
+      // Normal steering should feel planted - grip only drops (a lot) while the
+      // handbrake is actually held. A moderate non-drift grip made even ordinary
+      // cornering slide noticeably, which read as the car drifting on its own instead
+      // of drifting being something you choose to do.
+      const grip=input.drift?.55:26;
       player.moveHeading=angDamp(player.moveHeading,player.heading,grip,dt);
       player.position.x+=Math.sin(player.moveHeading)*player.speed*dt;
       player.position.z+=Math.cos(player.moveHeading)*player.speed*dt;
@@ -292,19 +296,28 @@
       }
       updateLapProgress(player,info);
       const driftAngle=angDelta(player.moveHeading,player.heading),driftMag=Math.abs(driftAngle),sliding=driftMag>.1&&speedAbs>9;
+      // Nitro is now EARNED by drifting, not free over time - the whole reason to drift
+      // during a race instead of just driving clean is that a good slide through a
+      // corner is what actually fills the tank for the boost you need on the next
+      // straight to win. A small passive trickle keeps a car that never drifts at all
+      // from being permanently stuck at zero, but it's far too slow to rely on.
+      if(!boost){
+        if(sliding)nitro=Math.min(1,nitro+driftMag*speedAbs*.0026*dt);
+        nitro=Math.min(1,nitro+dt*.012);
+      }
       if(sliding){const pts=Math.round(driftMag*speedAbs*7.5);driftScore+=pts;totalScore+=pts;lastPuff-=dt;if(lastPuff<=0){const puffScale=1.1+Math.min(1,driftMag)*.9,hs=Math.sin(player.heading),hc=Math.cos(player.heading),bx=-hs*1.65,bz=-hc*1.65,sx=hc*.78,sz=-hs*.78;puff(vA.set(player.position.x+bx-sx,player.position.y+.3,player.position.z+bz-sz),puffScale);puff(vB.set(player.position.x+bx+sx,player.position.y+.3,player.position.z+bz+sz),puffScale);lastPuff=.026}}else{driftScore=0}
       placeCar(player,dt)}
-    function updateAI(dt){for(let i=1;i<cars.length;i++){const c=cars[i],info=nearestSample(c.position,c._sampleHint);c._sampleHint=info.index;const lookAhead=9+Math.abs(c.speed)*.35,preferredLane=((i%3)-1)*4.5+Math.sin(raceTime*.15+c.seed)*1.1,tp=pointAtArc(info.arc+lookAhead,preferredLane),dx=tp.x-c.position.x,dz=tp.z-c.position.z,desiredHeading=Math.atan2(dx,dz),err=angDelta(c.heading,desiredHeading);c.position.y=THREE.MathUtils.lerp(c.position.y,info.y,1-Math.exp(-dt*22));c.steer=THREE.MathUtils.clamp(err*2.4,-1,1);const target=c.base+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.0*speedFactor*dt;c.moveHeading=angDamp(c.moveHeading,c.heading,6.5,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}updateLapProgress(c,info);placeCar(c,dt)}}
+    function updateAI(dt){for(let i=1;i<cars.length;i++){const c=cars[i],info=nearestSample(c.position,c._sampleHint);c._sampleHint=info.index;const lookAhead=9+Math.abs(c.speed)*.35,preferredLane=((i%3)-1)*4.5+Math.sin(raceTime*.15+c.seed)*1.1,tp=pointAtArc(info.arc+lookAhead,preferredLane),dx=tp.x-c.position.x,dz=tp.z-c.position.z,desiredHeading=Math.atan2(dx,dz),err=angDelta(c.heading,desiredHeading);c.position.y=THREE.MathUtils.lerp(c.position.y,info.y,1-Math.exp(-dt*22));c.steer=THREE.MathUtils.clamp(err*2.4,-1,1);const target=c.base+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.0*speedFactor*dt;c.moveHeading=angDamp(c.moveHeading,c.heading,13,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}updateLapProgress(c,info);placeCar(c,dt)}}
     function collisions(){for(let i=1;i<cars.length;i++){const c=cars[i],dx=c.position.x-player.position.x,dz=c.position.z-player.position.z,dist=Math.hypot(dx,dz);if(dist<3.2&&dist>.001){const nx=dx/dist,nz=dz/dist;player.speed*=.93;player.position.x-=nx*.12;player.position.z-=nz*.12;c.position.x+=nx*.12;c.position.z+=nz*.12}}}
     const camTarget=new THREE.Vector3(),camDesired=new THREE.Vector3(),look=new THREE.Vector3();
-    function updateCamera(dt){const hs=Math.sin(player.heading),hc=Math.cos(player.heading),tx=hs,tz=hc,sx=-hc,sz=hs,speedAbs=Math.abs(player.speed);camTarget.set(player.position.x,player.position.y+1.15,player.position.z);let distance=8.8+Math.min(speedAbs,90)*.045,height=3.6,yaw=orbitYaw;if(camMode===1){camDesired.set(player.position.x+tx*1.1,player.position.y+1.22,player.position.z+tz*1.1);look.set(player.position.x+tx*18,player.position.y+.7,player.position.z+tz*18)}else{if(camMode===0&&!dragging){yaw=THREE.MathUtils.lerp(yaw,0,1-Math.exp(-dt*4));orbitYaw=yaw;orbitPitch=THREE.MathUtils.lerp(orbitPitch,.2,dt*2)}if(camMode===2){distance=9.7;height=2.4+Math.sin(orbitPitch)*7}const behindScale=-Math.cos(yaw)*distance,acrossScale=Math.sin(yaw)*distance;camDesired.set(camTarget.x+tx*behindScale+sx*acrossScale,camTarget.y+height,camTarget.z+tz*behindScale+sz*acrossScale);look.copy(camTarget)}
+    function updateCamera(dt){const hs=Math.sin(player.heading),hc=Math.cos(player.heading),tx=hs,tz=hc,sx=-hc,sz=hs,speedAbs=Math.abs(player.speed);camTarget.set(player.position.x,player.position.y+1.15,player.position.z);let distance=11.5+Math.min(speedAbs,90)*.045,height=4.6,yaw=orbitYaw;if(camMode===1){camDesired.set(player.position.x+tx*1.1,player.position.y+1.22,player.position.z+tz*1.1);look.set(player.position.x+tx*18,player.position.y+.7,player.position.z+tz*18)}else{if(camMode===0&&!dragging){yaw=THREE.MathUtils.lerp(yaw,0,1-Math.exp(-dt*4));orbitYaw=yaw;orbitPitch=THREE.MathUtils.lerp(orbitPitch,.2,dt*2)}if(camMode===2){distance=12.5;height=2.4+Math.sin(orbitPitch)*7}const behindScale=-Math.cos(yaw)*distance,acrossScale=Math.sin(yaw)*distance;camDesired.set(camTarget.x+tx*behindScale+sx*acrossScale,camTarget.y+height,camTarget.z+tz*behindScale+sz*acrossScale);look.copy(camTarget)}
       // Top speed was toned down (drift, not top speed, is the point now), so the sense
       // of speed has to come from the camera/screen instead of a big number - a bigger
       // shake, faster FOV widening, and the radial streak overlay below all kick in
       // earlier and harder than before to compensate.
       const shakeAmt=Math.max(0,speedAbs-28)*.0034;
       if(shakeAmt>0){camDesired.x+=(Math.random()-.5)*shakeAmt;camDesired.y+=(Math.random()-.5)*shakeAmt*.6;camDesired.z+=(Math.random()-.5)*shakeAmt}
-      camera.position.lerp(camDesired,1-Math.exp(-dt*7));camera.lookAt(look);camera.fov=THREE.MathUtils.lerp(camera.fov,58+Math.max(0,speedAbs-13)*.6+(input.nitro&&nitro>0?20:0),dt*5);camera.updateProjectionMatrix();
+      camera.position.lerp(camDesired,1-Math.exp(-dt*7));camera.lookAt(look);camera.fov=THREE.MathUtils.lerp(camera.fov,64+Math.max(0,speedAbs-13)*.6+(input.nitro&&nitro>0?20:0),dt*5);camera.updateProjectionMatrix();
       updateSpeedFx(speedAbs)}
     const fxCanvas=$('speedFx'),fxCtx=fxCanvas.getContext('2d');
     function resizeFx(){fxCanvas.width=innerWidth*Math.min(devicePixelRatio,1.6);fxCanvas.height=innerHeight*Math.min(devicePixelRatio,1.6)}
