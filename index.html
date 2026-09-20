@@ -260,16 +260,21 @@
     // sports-car pack (hypercar/supercar/muscle/rally/police/offroad silhouettes) that
     // had been extracted once before but never made it into the live build - added back
     // in per request, both as playable choices and as the AI's racing roster.
-    const TYPE_BASE_SPEED=[0,58,53,36,39,33,34,59,58,60,57,45,56,55,42,38,57,44,37]; // by assetIndex: [player-only,SportsCar2,Cop,Taxi,SUV,NormalCar1,NormalCar2,fenyr,italia,lamb,ghini,coupe,kamaro,rally,armor,jeep,police,mobil,van]
-    // TYPE_BASE_SPEED was originally tuned against a 54-unit player top speed. When that
-    // was cut to 40 (so cars didn't blow through corners faster than there's room to
-    // drift them), this scale wasn't re-balanced with it - every racer AI's base cruise
-    // speed ended up at or above the player's new top speed (40.7-46.2 vs 40), meaning
-    // the player was slower than literally every AI car on a plain straight, before any
-    // drifting even entered into it. Re-tuned so the average racer sits at ~39, just
-    // under the player's own top speed - the player's edge is meant to come from
-    // drifting/mini-turbo, not from AI cars being flatly faster in a straight line.
-    const AI_SPEED_SCALE=.65;
+    // Real-world top speed (mph) per assetIndex, by vehicle class - a hypercar tops out
+    // near 220mph, a cargo van near 95mph, instead of every car in the game sharing the
+    // same flat, unrealistic number. player.speed is already true meters/second
+    // (updateHUD's mph readout is an exact m/s->mph conversion), so this converts
+    // directly into real speed caps. Shared with the VEHICLES stat list further down, so
+    // there's one source of truth for each car's actual top speed.
+    const VEHICLE_TOP_MPH=[165,180,150,120,130,115,130,220,205,210,195,160,170,135,110,105,150,115,95]; // by assetIndex: [ApexGT,VelocityS2,Interceptor,CityCab,Trailblazer,Commuter,SedanLX,fenyr,italia,lamb,ghini,coupe,kamaro,rally,armor,jeep,police,mobil,van]
+    const mphToMs=mph=>mph/2.23694;
+    // A car's TOP speed and its actual average pace on a technical, corner-heavy circuit
+    // are very different things in real racing - nobody sustains 220mph on a track this
+    // tight. AI cruises at this fraction of its true top speed by default (still scaled
+    // up further by its own drift-cornering bonus below), which is what keeps a
+    // realistic top-speed cap from turning into an AI field that's absurdly fast on
+    // every straight.
+    const AI_CRUISE_FACTOR=.62;
     // Only some AI cars are actual racing rivals (ranked, lap-counted) - the rest is
     // ambient traffic sharing the road but not part of the race. Without a clear marker
     // the two were indistinguishable at a glance, so racers get a floating chevron above
@@ -338,11 +343,11 @@
     function makeCar(i){const root=new THREE.Group();scene.add(root);const rosterEntry=i===0?{assetIndex:0,racer:true}:AI_ROSTER[(i-1)%AI_ROSTER.length],assetIndex=rosterEntry.assetIndex,racer=rosterEntry.racer;
       const visual=buildCarVisual(root,assetIndex,i>=7?colors[i]:null);
       if(racer&&i>0){const marker=new THREE.Sprite(markerMat);marker.scale.set(1.3,1.3,1.3);marker.position.set(0,visual.box.max.y+1.3,0);root.add(marker)}
-      const st=spawnTransform(i);const c={root,model:visual.model,wheels:visual.wheels,groundLift:visual.groundLift,sirenLights:visual.sirenLights,racer,assetIndex,position:st.position,heading:st.heading,moveHeading:st.heading,speed:0,steer:0,_lastIdx:null,lapDist:0,progress:0,lap:1,ai:i>0,base:(i===0?58:TYPE_BASE_SPEED[assetIndex]+(i%3)*2.2)*AI_SPEED_SCALE,laneOffset:((i%3)-1)*4.5,seed:i*7.31};cars.push(c);return c}
+      const st=spawnTransform(i);const c={root,model:visual.model,wheels:visual.wheels,groundLift:visual.groundLift,sirenLights:visual.sirenLights,racer,assetIndex,position:st.position,heading:st.heading,moveHeading:st.heading,speed:0,steer:0,_lastIdx:null,lapDist:0,progress:0,lap:1,ai:i>0,base:mphToMs(VEHICLE_TOP_MPH[assetIndex])*AI_CRUISE_FACTOR+(i%3)*1.5,laneOffset:((i%3)-1)*4.5,seed:i*7.31};cars.push(c);return c}
     // Re-skins the player's car in place (position/physics untouched) - used by the
     // vehicle-select screen so cycling through cars updates the live 3D preview.
     function setPlayerVehicle(assetIndex){const visual=buildCarVisual(player.root,assetIndex,null);player.model=visual.model;player.wheels=visual.wheels;player.groundLift=visual.groundLift;player.sirenLights=visual.sirenLights;player.assetIndex=assetIndex;player.rollVisual=0;
-      const spec=VEHICLES.find(v=>v.assetIndex===assetIndex);player.statMods=spec?statMultipliers(spec):{speedMult:1,accelMult:1,handlingMult:1}}
+      const spec=VEHICLES.find(v=>v.assetIndex===assetIndex);player.statMods=spec?statMultipliers(spec):{topMs:mphToMs(150),accelMult:1,handlingMult:1}}
     for(let i=0;i<12;i++)makeCar(i);const player=cars[0];
     function placeCar(c,dt=0){const driftAngle=angDelta(c.moveHeading,c.heading);c.root.position.set(c.position.x,c.position.y+c.groundLift,c.position.z);c.root.rotation.order='YXZ';c.root.rotation.y=c.heading;
       // Body roll/pitch are SMOOTHED toward their target (not snapped instantly) and
@@ -493,7 +498,7 @@
       const steerTarget=input.steerAxis!=null?input.steerAxis:(input.right?1:0)-(input.left?1:0);
       const gasAmt=input.throttleAxis!=null&&input.throttleAxis>.02?input.throttleAxis:(input.gas?1:0);
       const brakeAmt=input.brakeAxis!=null&&input.brakeAxis>.02?input.brakeAxis:(input.brake?1:0);
-      const sm=player.statMods||{speedMult:1,accelMult:1,handlingMult:1};
+      const sm=player.statMods||{topMs:mphToMs(150),accelMult:1,handlingMult:1};
       if(player.yawRate===undefined)player.yawRate=0;
       if(player._driftActive===undefined)player._driftActive=false;
       if(player._driftDir===undefined)player._driftDir=0;
@@ -509,14 +514,17 @@
       if(nitroBoost)nitro=Math.max(0,nitro-dt*.24);
       const miniBoost=player._miniBoostTimer>0;
       if(miniBoost)player._miniBoostTimer=Math.max(0,player._miniBoostTimer-dt);
-      const baseTop=40*sm.speedMult;
+      // Real top speed for the selected car's class (see VEHICLES' topMph) - a hypercar
+      // caps near 220mph, a cargo van near 95mph, instead of every car sharing the same
+      // flat, unrealistic ~89mph ceiling.
+      const baseTop=sm.topMs;
       // Drifting is the fast line now, not just the mini-turbo payout you get after
       // releasing it - a real top-speed bonus applies for the whole time the slide is
       // active, plus a forward thrust while sliding, and the old extra drag that used to
       // bleed speed off DURING a drift is cut way down so holding the slide doesn't
       // fight the reward for doing it. Normal (non-drift) driving is untouched.
       const driftTopBonus=player._driftActive?1.3:1;
-      const top=nitroBoost?62*sm.speedMult:baseTop*driftTopBonus+(miniBoost?player._miniBoostStrength*.9:0);
+      const top=nitroBoost?baseTop*1.25:baseTop*driftTopBonus+(miniBoost?player._miniBoostStrength*.9:0);
       const accel=gasAmt*(nitroBoost?32:18)*sm.accelMult,miniAccel=miniBoost?player._miniBoostStrength:0,driftThrust=player._driftActive&&Math.abs(player.speed)>8?10*sm.accelMult:0,brake=brakeAmt*30;
       player.speed+=(accel+miniAccel+driftThrust-brake)*dt;
       const rollingDrag=.65+Math.abs(player.speed)*.012+(player._driftActive?.25:0);
@@ -716,32 +724,35 @@
     // scales NORMAL (non-handbrake) grip - every car keeps the exact same handbrake
     // drift (that's the point of the game), a low-handling car is just looser and more
     // twitchy the rest of the time. Stats are 1-5, shown as filled bars in the picker.
+    // topMph here matches VEHICLE_TOP_MPH above (defined early so makeCar can use it
+    // before this point in the file) - kept spelled out per-entry alongside name/tag/
+    // stats since this is the human-readable stats table shown in the picker.
     const VEHICLES=[
-      {assetIndex:0,name:'Apex GT',tag:'Balanced sports coupe',speed:4,accel:4,handling:3},
-      {assetIndex:1,name:'Velocity S2',tag:'Lightweight sports car',speed:5,accel:5,handling:2},
-      {assetIndex:2,name:'Interceptor',tag:'Police-tuned pursuit',speed:4,accel:3,handling:4},
-      {assetIndex:3,name:'City Cab',tag:'Taxi',speed:2,accel:2,handling:5},
-      {assetIndex:4,name:'Trailblazer',tag:'SUV',speed:2,accel:2,handling:3},
-      {assetIndex:5,name:'Commuter',tag:'Compact',speed:3,accel:3,handling:4},
-      {assetIndex:6,name:'Sedan LX',tag:'Sedan',speed:3,accel:3,handling:3},
+      {assetIndex:0,name:'Apex GT',tag:'Balanced sports coupe',speed:4,accel:4,handling:3,topMph:165},
+      {assetIndex:1,name:'Velocity S2',tag:'Lightweight sports car',speed:5,accel:5,handling:2,topMph:180},
+      {assetIndex:2,name:'Interceptor',tag:'Police-tuned pursuit',speed:4,accel:3,handling:4,topMph:150},
+      {assetIndex:3,name:'City Cab',tag:'Taxi',speed:2,accel:2,handling:5,topMph:120},
+      {assetIndex:4,name:'Trailblazer',tag:'SUV',speed:2,accel:2,handling:3,topMph:130},
+      {assetIndex:5,name:'Commuter',tag:'Compact',speed:3,accel:3,handling:4,topMph:115},
+      {assetIndex:6,name:'Sedan LX',tag:'Sedan',speed:3,accel:3,handling:3,topMph:130},
       // A second, more varied sports-car pack - hypercar/supercar/muscle/rally/police/
       // offroad silhouettes - restored after being found still sitting unused in an
       // earlier bundled build. These 7 (all but Street Coupe/Armor Unit/Trail Runner/
       // City Runner/Cargo Van) are also the AI's racing roster - see AI_ROSTER.
-      {assetIndex:7,name:'Nemesis GT',tag:'Hypercar',speed:5,accel:5,handling:2},
-      {assetIndex:8,name:'Scarlet GT',tag:'Supercar',speed:5,accel:4,handling:3},
-      {assetIndex:9,name:'Super V12',tag:'Supercar',speed:5,accel:5,handling:2},
-      {assetIndex:10,name:'Onyx Supercar',tag:'Supercar',speed:4,accel:4,handling:3},
-      {assetIndex:11,name:'Street Coupe',tag:'Sports coupe',speed:3,accel:3,handling:4},
-      {assetIndex:12,name:'Muscle 6.2',tag:'Muscle car',speed:4,accel:5,handling:2},
-      {assetIndex:13,name:'Rally Cross',tag:'Rally car',speed:4,accel:4,handling:5},
-      {assetIndex:14,name:'Armor Unit',tag:'Armored SUV',speed:2,accel:2,handling:4},
-      {assetIndex:15,name:'Trail Runner',tag:'Off-roader',speed:2,accel:2,handling:3},
-      {assetIndex:16,name:'Police Cruiser',tag:'Police-tuned pursuit',speed:4,accel:3,handling:4},
-      {assetIndex:17,name:'City Runner',tag:'Compact',speed:3,accel:3,handling:3},
-      {assetIndex:18,name:'Cargo Van',tag:'Van',speed:2,accel:2,handling:3}
+      {assetIndex:7,name:'Nemesis GT',tag:'Hypercar',speed:5,accel:5,handling:2,topMph:220},
+      {assetIndex:8,name:'Scarlet GT',tag:'Supercar',speed:5,accel:4,handling:3,topMph:205},
+      {assetIndex:9,name:'Super V12',tag:'Supercar',speed:5,accel:5,handling:2,topMph:210},
+      {assetIndex:10,name:'Onyx Supercar',tag:'Supercar',speed:4,accel:4,handling:3,topMph:195},
+      {assetIndex:11,name:'Street Coupe',tag:'Sports coupe',speed:3,accel:3,handling:4,topMph:160},
+      {assetIndex:12,name:'Muscle 6.2',tag:'Muscle car',speed:4,accel:5,handling:2,topMph:170},
+      {assetIndex:13,name:'Rally Cross',tag:'Rally car',speed:4,accel:4,handling:5,topMph:135},
+      {assetIndex:14,name:'Armor Unit',tag:'Armored SUV',speed:2,accel:2,handling:4,topMph:110},
+      {assetIndex:15,name:'Trail Runner',tag:'Off-roader',speed:2,accel:2,handling:3,topMph:105},
+      {assetIndex:16,name:'Police Cruiser',tag:'Police-tuned pursuit',speed:4,accel:3,handling:4,topMph:150},
+      {assetIndex:17,name:'City Runner',tag:'Compact',speed:3,accel:3,handling:3,topMph:115},
+      {assetIndex:18,name:'Cargo Van',tag:'Van',speed:2,accel:2,handling:3,topMph:95}
     ];
-    function statMultipliers(v){return{speedMult:.8+(v.speed-1)*.1,accelMult:.8+(v.accel-1)*.1,handlingMult:.85+(v.handling-1)*.075}}
+    function statMultipliers(v){return{topMs:mphToMs(v.topMph),accelMult:.8+(v.accel-1)*.1,handlingMult:.85+(v.handling-1)*.075}}
     // A one-time render-to-texture snapshot of each car, cached, so the picker shows
     // what you're actually choosing instead of just a name - a fresh scene/camera keeps
     // this completely independent of wherever the real car currently sits on track (the
