@@ -261,10 +261,15 @@
     // had been extracted once before but never made it into the live build - added back
     // in per request, both as playable choices and as the AI's racing roster.
     const TYPE_BASE_SPEED=[0,58,53,36,39,33,34,59,58,60,57,45,56,55,42,38,57,44,37]; // by assetIndex: [player-only,SportsCar2,Cop,Taxi,SUV,NormalCar1,NormalCar2,fenyr,italia,lamb,ghini,coupe,kamaro,rally,armor,jeep,police,mobil,van]
-    // Kept in step with the player's own top speed (54->40, an 0.74x cut made so cars
-    // don't blow through corners faster than there's room to actually drift them) -
-    // otherwise the AI pack would suddenly be running noticeably faster than the player.
-    const AI_SPEED_SCALE=.74;
+    // TYPE_BASE_SPEED was originally tuned against a 54-unit player top speed. When that
+    // was cut to 40 (so cars didn't blow through corners faster than there's room to
+    // drift them), this scale wasn't re-balanced with it - every racer AI's base cruise
+    // speed ended up at or above the player's new top speed (40.7-46.2 vs 40), meaning
+    // the player was slower than literally every AI car on a plain straight, before any
+    // drifting even entered into it. Re-tuned so the average racer sits at ~39, just
+    // under the player's own top speed - the player's edge is meant to come from
+    // drifting/mini-turbo, not from AI cars being flatly faster in a straight line.
+    const AI_SPEED_SCALE=.65;
     // Only some AI cars are actual racing rivals (ranked, lap-counted) - the rest is
     // ambient traffic sharing the road but not part of the race. Without a clear marker
     // the two were indistinguishable at a glance, so racers get a floating chevron above
