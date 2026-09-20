@@ -32,6 +32,9 @@
     @keyframes blink{0%,100%{opacity:1}50%{opacity:.22}}
     #controlsBtn{position:absolute;right:clamp(16px,3vw,40px);bottom:clamp(16px,3vh,40px);border:2px solid rgba(36,245,239,.5);background:rgba(4,19,28,.6);color:#cdeff2;padding:11px 20px;border-radius:11px;font-weight:900;font-size:13px;letter-spacing:.08em;cursor:pointer;pointer-events:auto}
     #controlsBtn:hover{border-color:var(--cyan)}
+    #updateBtn{position:absolute;left:clamp(16px,3vw,40px);bottom:clamp(16px,3vh,40px);border:2px solid rgba(255,211,29,.5);background:rgba(28,22,4,.6);color:#ffe9a8;padding:11px 20px;border-radius:11px;font-weight:900;font-size:13px;letter-spacing:.08em;cursor:pointer;pointer-events:auto}
+    #updateBtn:hover{border-color:var(--yellow)}
+    #updateBtn.checking{animation:blink 1s ease-in-out infinite}
     .pickRow{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0;max-height:52vh;overflow-y:auto}
     .pickCard{border:2px solid rgba(120,220,230,.25);background:rgba(6,20,30,.55);border-radius:14px;padding:12px 16px 15px;cursor:pointer;width:158px;text-align:center;transition:border-color .15s,transform .15s}
     .pickCard:hover{border-color:rgba(120,220,230,.55)}
@@ -75,7 +78,7 @@
     <div id="debugReadout" style="position:absolute;left:14px;top:100px;font-size:11px;font-weight:700;background:rgba(0,0,0,.55);padding:6px 9px;border-radius:8px;line-height:1.5;font-style:normal;letter-spacing:0"></div>
     <div id="nitro"><div id="nitroFill"></div></div><div id="banner">3</div>
   </div>
-  <section id="attract" class="screen"><div class="menuCard"><div class="eyebrow">A TRUE 3D DRIFT RACE</div><div class="logo">DRIFTING<span>DREAMS</span></div><p class="tag">Twelve real 3D cars. Full 360° camera. Weight transfer, counter-steer, tire smoke and speed you can feel.</p><div id="attractPrompt">PRESS ANY KEY, BUTTON OR TAP TO CONTINUE</div></div><button id="controlsBtn">⚙ CONTROLS &amp; MAPPING</button></section>
+  <section id="attract" class="screen"><div class="menuCard"><div class="eyebrow">A TRUE 3D DRIFT RACE</div><div class="logo">DRIFTING<span>DREAMS</span></div><p class="tag">Twelve real 3D cars. Full 360° camera. Weight transfer, counter-steer, tire smoke and speed you can feel.</p><div id="attractPrompt">PRESS ANY KEY, BUTTON OR TAP TO CONTINUE</div></div><button id="updateBtn">⟳ CHECK FOR UPDATE</button><button id="controlsBtn">⚙ CONTROLS &amp; MAPPING</button></section>
   <section id="vehicleSelect" class="screen hidden"><div class="menuCard wideCard"><div class="eyebrow">STEP 1 OF 2</div><div class="logo" style="font-size:clamp(32px,4.8vw,52px)">CHOOSE YOUR<span>CAR</span></div><div class="pickRow" id="vehicleRow"></div><div class="bigBtnRow"><button class="ghostBtn" id="vehicleBack">BACK</button><button class="ctaBtn" id="vehicleNext">SELECT CAR</button></div></div></section>
   <section id="trackSelect" class="screen hidden"><div class="menuCard wideCard"><div class="eyebrow">STEP 2 OF 2</div><div class="logo" style="font-size:clamp(32px,4.8vw,52px)">CHOOSE YOUR<span>TRACK</span></div><div class="pickRow" id="trackRow"></div><div class="bigBtnRow"><button class="ghostBtn" id="trackBack">BACK</button><button class="ctaBtn" id="trackNext">START RACE</button></div></div></section>
   <section id="controlsScreen" class="screen hidden"><div class="menuCard wideCard settingsPanel"><div class="eyebrow">SETTINGS</div><div class="logo" style="font-size:clamp(28px,4.4vw,44px)">CONTROL<span>MAPPING</span></div><div id="gpStatus">No controller detected</div><div id="bindList"></div><div class="bigBtnRow"><button class="ghostBtn" id="bindReset">RESET TO DEFAULTS</button><button class="ctaBtn" id="bindBack">DONE</button></div></div></section>
@@ -339,6 +342,34 @@
     function puff(pos,scale=1){let s=smokes.find(x=>!x.visible);if(!s){s=new THREE.Sprite(smokeMat.clone());scene.add(s);smokes.push(s)}s.visible=true;s.position.copy(pos);s.position.y+=.25;s.userData.rot=(Math.random()-.5)*1.4;s.material.rotation=s.userData.rot;s.scale.setScalar(scale*1.3);s.userData.life=1;s.material.opacity=.5}
     function updateSmoke(dt){for(const s of smokes)if(s.visible){s.userData.life-=dt*.72;s.position.y+=dt*.9;s.userData.rot+=dt*.6;s.material.rotation=s.userData.rot;s.scale.addScalar(dt*1.7);s.material.opacity=Math.max(0,s.userData.life*.45);if(s.userData.life<=0)s.visible=false}}
 
+    // Tire skid marks: the one big drift-visual signature every reference shot of this
+    // genre has and this game was missing entirely - a trail of dark marks laid down on
+    // the road under each rear wheel while sliding, persisting much longer than smoke
+    // does before fading. With up to 12 cars able to drift at once and marks meant to
+    // last many seconds, a grow-as-needed pool (fine for smoke, which clears itself out
+    // in ~1.4s) would happily allocate thousands of meshes during sustained multi-car
+    // drifting - a real "mind the lag" risk, not a hypothetical one. So this is a
+    // HARD-FIXED pool of plain meshes (each keeps its own material for real per-mark
+    // opacity fading, same proven pattern as the smoke sprites above) reused round-robin:
+    // dropSkid always advances to the next slot and overwrites it unconditionally,
+    // whether or not it had fully faded yet, so the mesh/draw count never grows past
+    // SKID_CAP no matter how much drifting happens.
+    const SKID_CAP=220;
+    const skidCanvas=document.createElement('canvas');skidCanvas.width=24;skidCanvas.height=64;
+    {const sctx=skidCanvas.getContext('2d'),g=sctx.createLinearGradient(0,0,24,0);g.addColorStop(0,'rgba(12,10,14,0)');g.addColorStop(.35,'rgba(12,10,14,1)');g.addColorStop(.65,'rgba(12,10,14,1)');g.addColorStop(1,'rgba(12,10,14,0)');sctx.fillStyle=g;sctx.fillRect(0,0,24,64)}
+    const skidTex=new THREE.CanvasTexture(skidCanvas);
+    const skidGeo=new THREE.PlaneGeometry(.34,1.15);skidGeo.rotateX(-Math.PI/2);
+    const skidMat=new THREE.MeshBasicMaterial({map:skidTex,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4});
+    const skidMarks=[];
+    for(let i=0;i<SKID_CAP;i++){const m=new THREE.Mesh(skidGeo,skidMat.clone());m.visible=false;m.userData.life=0;scene.add(m);skidMarks.push(m)}
+    let skidCursor=0;
+    function dropSkid(pos,heading,strength){
+      const m=skidMarks[skidCursor];skidCursor=(skidCursor+1)%SKID_CAP;
+      m.position.set(pos.x,pos.y+.025,pos.z);m.rotation.y=heading;m.visible=true;
+      m.userData.life=1;m.userData.baseOpacity=Math.min(.85,.35+strength*.5);m.material.opacity=m.userData.baseOpacity;
+    }
+    function updateSkids(dt){for(const m of skidMarks)if(m.visible){m.userData.life-=dt*.09;if(m.userData.life<=0){m.visible=false;continue}m.material.opacity=m.userData.baseOpacity*Math.min(1,m.userData.life*2)}}
+
     // Input is unified from three sources - keyboard, on-screen touch buttons, and an
     // optional gamepad - each writing to its OWN held-state object so one source can
     // never clobber another (e.g. a gamepad poll finding its button up must not stomp a
@@ -443,7 +474,7 @@
       // Whichever car was picked on the vehicle-select screen actually matters here -
       // Speed/Accel scale top speed and throttle response, Handling scales grip below.
       const sm=player.statMods||{speedMult:1,accelMult:1,handlingMult:1};
-      player.steer=THREE.MathUtils.lerp(player.steer,steerTarget,1-Math.exp(-dt*13));const boost=input.nitro&&nitro>0&&player.speed>12;if(boost)nitro=Math.max(0,nitro-dt*.24);const top=(boost?92:54)*sm.speedMult,accel=gasAmt*(boost?32:17)*sm.accelMult,brake=brakeAmt*30;player.speed+=accel*dt-brake*dt;player.speed-=dt*(1.05+player.speed*.01);player.speed=THREE.MathUtils.clamp(player.speed,brakeAmt>0&&gasAmt<=0?-8:0,top);
+      player.steer=THREE.MathUtils.lerp(player.steer,steerTarget,1-Math.exp(-dt*20));const boost=input.nitro&&nitro>0&&player.speed>12;if(boost)nitro=Math.max(0,nitro-dt*.24);const top=(boost?92:54)*sm.speedMult,accel=gasAmt*(boost?32:17)*sm.accelMult,brake=brakeAmt*30;player.speed+=accel*dt-brake*dt;player.speed-=dt*(1.05+player.speed*.01);player.speed=THREE.MathUtils.clamp(player.speed,brakeAmt>0&&gasAmt<=0?-8:0,top);
       // Real heading physics: steer only changes which way the car is POINTED (yaw).
       // moveHeading (actual travel direction) chases heading at a grip-dependent rate -
       // fairly quick normally but no longer near-instant, so committing hard to a turn
@@ -452,7 +483,11 @@
       // is the point here, not outright speed - position always integrates along
       // moveHeading, in world space, so failing to steer through a bend sends you
       // straight off the road exactly like a real car.
-      const speedAbs=Math.abs(player.speed),speedFactor=Math.max(.4,Math.min(1,speedAbs/8)),dirSign=player.speed>=0?1:-1;
+      // Turning was floored at 40% response below speed 8 - meant to stop the car
+      // spinning in place at a dead stop, but it also meant the very common case of
+      // steering right off the start line, or right after slowing for a corner, felt
+      // muted/laggy before speed built back up. Higher floor, reached sooner.
+      const speedAbs=Math.abs(player.speed),speedFactor=Math.max(.6,Math.min(1,speedAbs/5)),dirSign=player.speed>=0?1:-1;
       player.heading+=player.steer*4.4*speedFactor*dirSign*dt;
       // A real fishtail is a SNAP, not a gradual lean - yanking the handbrake mid-turn
       // should whip the front away from the rear instantly (weight transfer breaking the
@@ -474,7 +509,7 @@
       // of drifting being something you choose to do. Handling only scales THIS half -
       // the handbrake drift itself (.55) stays identical across every car, since that's
       // the one thing every car in a drift game needs to be equally good at.
-      const grip=input.drift?.55:26*sm.handlingMult;
+      const grip=input.drift?.55:20*sm.handlingMult;
       player.moveHeading=angDamp(player.moveHeading,player.heading,grip,dt);
       player.position.x+=Math.sin(player.moveHeading)*player.speed*dt;
       player.position.z+=Math.cos(player.moveHeading)*player.speed*dt;
@@ -501,7 +536,14 @@
         if(sliding)nitro=Math.min(1,nitro+driftMag*speedAbs*.0055*dt);
         nitro=Math.min(1,nitro+dt*.012);
       }
-      if(sliding){const pts=Math.round(driftMag*speedAbs*7.5);driftScore+=pts;totalScore+=pts;lastPuff-=dt;if(lastPuff<=0){const puffScale=1.1+Math.min(1,driftMag)*.9,hs=Math.sin(player.heading),hc=Math.cos(player.heading),bx=-hs*1.65,bz=-hc*1.65,sx=hc*.78,sz=-hs*.78;puff(vA.set(player.position.x+bx-sx,player.position.y+.3,player.position.z+bz-sz),puffScale);puff(vB.set(player.position.x+bx+sx,player.position.y+.3,player.position.z+bz+sz),puffScale);lastPuff=.026}}else{driftScore=0}
+      if(sliding){const pts=Math.round(driftMag*speedAbs*7.5);driftScore+=pts;totalScore+=pts;lastPuff-=dt;if(lastPuff<=0){const puffScale=1.1+Math.min(1,driftMag)*.9,hs=Math.sin(player.heading),hc=Math.cos(player.heading),bx=-hs*1.65,bz=-hc*1.65,sx=hc*.78,sz=-hs*.78;puff(vA.set(player.position.x+bx-sx,player.position.y+.3,player.position.z+bz-sz),puffScale);puff(vB.set(player.position.x+bx+sx,player.position.y+.3,player.position.z+bz+sz),puffScale);lastPuff=.026}
+        // Skid marks are triggered by DISTANCE travelled, not a fixed timer - ties mark
+        // density to actual ground covered (not frame rate or speed), so the fixed pool
+        // above gets spent on a predictable, consistent trail length instead of firing
+        // faster (and recycling sooner) the faster the car happens to be going.
+        if(player._skidAccum===undefined)player._skidAccum=0;player._skidAccum+=speedAbs*dt;
+        if(player._skidAccum>1.05){const hs=Math.sin(player.heading),hc=Math.cos(player.heading),bx=-hs*1.65,bz=-hc*1.65,sx=hc*.78,sz=-hs*.78;dropSkid(vA.set(player.position.x+bx-sx,player.position.y+.3,player.position.z+bz-sz),player.moveHeading,Math.min(1,driftMag));dropSkid(vB.set(player.position.x+bx+sx,player.position.y+.3,player.position.z+bz+sz),player.moveHeading,Math.min(1,driftMag));player._skidAccum=0}
+      }else{driftScore=0}
       placeCar(player,dt)}
     // Pulled out of updateAI's loop body so the attract-mode demo can drive EVERY car
     // (including the one that becomes the player) with the exact same logic, instead of
@@ -525,6 +567,8 @@
         if(c._lastPuff===undefined)c._lastPuff=0;
         c._lastPuff-=dt;
         if(c._lastPuff<=0){const hs=Math.sin(c.heading),hc=Math.cos(c.heading),bx=-hs*1.5,bz=-hc*1.5,sx=hc*.7,sz=-hs*.7;puff(vA.set(c.position.x+bx-sx,c.position.y+.3,c.position.z+bz-sz),.85);puff(vB.set(c.position.x+bx+sx,c.position.y+.3,c.position.z+bz+sz),.85);c._lastPuff=.06}
+        if(c._skidAccum===undefined)c._skidAccum=0;c._skidAccum+=Math.abs(c.speed)*dt;
+        if(c._skidAccum>1.05){const hs=Math.sin(c.heading),hc=Math.cos(c.heading),bx=-hs*1.5,bz=-hc*1.5,sx=hc*.7,sz=-hs*.7;dropSkid(vA.set(c.position.x+bx-sx,c.position.y+.3,c.position.z+bz-sz),c.moveHeading,Math.min(1,aiDriftMag));dropSkid(vB.set(c.position.x+bx+sx,c.position.y+.3,c.position.z+bz+sz),c.moveHeading,Math.min(1,aiDriftMag));c._skidAccum=0}
       }
       updateLapProgress(c,info);placeCar(c,dt)}
     function updateAI(dt){for(let i=1;i<cars.length;i++)driveAI(cars[i],dt)}
@@ -679,6 +723,10 @@
     $('vehicleNext').onclick=confirmVehicle;$('vehicleBack').onclick=()=>{mode='attract';showScreen('attract')};
     $('trackNext').onclick=confirmTrack;$('trackBack').onclick=()=>{mode='vehicleSelect';showScreen('vehicleSelect');renderVehicleRow()};
     $('controlsBtn').onclick=()=>{mode='controls';showScreen('controlsScreen');renderBindList()};
+    // Forces a fresh fetch of this same page bypassing whatever the browser cached -
+    // keybinds/gamepad mappings already survive this untouched since they live in
+    // localStorage, not in the page itself, so there's nothing else to "sync".
+    $('updateBtn').onclick=()=>{const btn=$('updateBtn');btn.classList.add('checking');btn.textContent='UPDATING…';const url=new URL(location.href);url.searchParams.set('_r',Date.now());setTimeout(()=>{location.href=url.toString()},250)};
     $('bindBack').onclick=()=>{listeningFor=null;mode='attract';showScreen('attract')};
     $('bindReset').onclick=()=>{KEYBINDS={...DEFAULT_KEYBINDS};GPBINDS=JSON.parse(JSON.stringify(DEFAULT_GPBINDS));saveBinds();renderBindList()};
     function renderBindList(){const list=$('bindList');list.innerHTML='';const head=document.createElement('div');head.className='bindRow';head.innerHTML='<span class="bindHead">ACTION</span><span class="bindHead">KEYBOARD</span><span class="bindHead">GAMEPAD</span>';list.appendChild(head);
@@ -686,18 +734,24 @@
         const kBtn=document.createElement('button');const kListening=listeningFor&&listeningFor.kind==='key'&&listeningFor.action===a.id;kBtn.className='bindKey'+(kListening?' listening':'');kBtn.textContent=kListening?'PRESS A KEY…':keyLabel(KEYBINDS[a.id]);kBtn.onclick=()=>{listeningFor={action:a.id,kind:'key'};renderBindList()};
         const gBtn=document.createElement('button');const gListening=listeningFor&&listeningFor.kind==='gp'&&listeningFor.action===a.id;gBtn.className='bindKey'+(gListening?' listening':'');gBtn.textContent=gListening?'PRESS A BUTTON…':gpLabel(GPBINDS[a.id]);gBtn.onclick=()=>{listeningFor={action:a.id,kind:'gp'};renderBindList()};
         row.appendChild(kBtn);row.appendChild(gBtn);list.appendChild(row)})}
-    document.addEventListener('pointerdown',e=>{if(mode!=='attract')return;if(e.target.closest('#controlsBtn'))return;advanceFromAttract()});
+    document.addEventListener('pointerdown',e=>{if(mode!=='attract')return;if(e.target.closest('#controlsBtn')||e.target.closest('#updateBtn'))return;advanceFromAttract()});
 
     // Cinematic attract-mode camera: cuts between a few movie-style shots of whichever
     // racer is currently leading the demo lap, instead of a single static menu backdrop.
-    let attractShot=0,attractTimer=0;const attractPick={pos:new THREE.Vector3(),look:new THREE.Vector3()};
+    // getLeader() was being called fresh every single frame and fed straight into the
+    // camera target - with several AI cars close in progress, "the leader" can flip
+    // between two different cars from one frame to the next, snapping camDesired/look
+    // to a different world position each time, which reads as the whole scene glitching/
+    // stuttering. Lock onto one subject only when a shot BEGINS and hold it for that
+    // shot's whole duration, the way an actual camera operator would.
+    let attractShot=0,attractTimer=0,attractSubject=null;const attractPick={pos:new THREE.Vector3(),look:new THREE.Vector3()};
     function updateAttractCamera(dt){
       attractTimer-=dt;
-      if(attractTimer<=0){attractShot=(attractShot+1)%4;attractTimer=5+Math.random()*2.5;
+      if(attractTimer<=0||!attractSubject){attractShot=(attractShot+1)%4;attractTimer=5+Math.random()*2.5;attractSubject=getLeader();
         if(attractShot===1){const s=SAMPLES[Math.floor(Math.random()*SAMPLE_N)];attractPick.pos.set(s.p.x+s.side.x*(TRACK_W+9),s.p.y+3,s.p.z+s.side.z*(TRACK_W+9))}
         if(attractShot===3){const s=SAMPLES[Math.floor(Math.random()*SAMPLE_N)];attractPick.pos.set(s.p.x-s.side.x*50,s.p.y+36,s.p.z-s.side.z*50)}
       }
-      const leader=getLeader();
+      const leader=attractSubject;
       if(attractShot===0){const hs=Math.sin(leader.heading),hc=Math.cos(leader.heading);camDesired.set(leader.position.x-hs*13,leader.position.y+5.2,leader.position.z-hc*13);look.set(leader.position.x,leader.position.y+1.2,leader.position.z)}
       else if(attractShot===1){camDesired.copy(attractPick.pos);look.set(leader.position.x,leader.position.y+1,leader.position.z)}
       else if(attractShot===2){const ang=raceTime*.35;camDesired.set(leader.position.x+Math.cos(ang)*16,leader.position.y+7,leader.position.z+Math.sin(ang)*16);look.set(leader.position.x,leader.position.y+1,leader.position.z)}
@@ -717,7 +771,7 @@
       if(mode==='attract'||mode==='controls'){raceTime+=dt;updateAttractDrive(dt);updateAttractCamera(dt)}
       else if(mode==='vehicleSelect'||mode==='trackSelect'){for(let i=1;i<cars.length;i++)driveAI(cars[i],dt);updateShowcase(dt)}
       else if(mode==='countdown'){countdown-=dt;const n=Math.ceil(countdown);$('banner').textContent=n>0?n:'GO!';$('banner').classList.add('show');if(countdown<=0){mode='race';setTimeout(()=>{if(!paused)$('banner').classList.remove('show')},650)}updateCamera(dt);updateHUD()}
-      else{raceTime+=dt;updatePlayer(dt);updateAI(dt);collisions();updateSmoke(dt);updateCamera(dt);updateHUD()}
+      else{raceTime+=dt;updatePlayer(dt);updateAI(dt);collisions();updateSmoke(dt);updateSkids(dt);updateCamera(dt);updateHUD()}
       composer.render()}
     tick();
     addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));composer.setSize(innerWidth,innerHeight);bloomPass.setSize(innerWidth,innerHeight)});
