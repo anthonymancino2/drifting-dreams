@@ -129,11 +129,17 @@
     // 90+ degrees in a single ~8-unit step), which isn't a tight corner, it's a fold -
     // AI cars measurably got stuck fighting it (barely reaching lap 2 in 90s instead of
     // lap 4-5). Back to the hand-placed entry/apex/exit corner-cluster technique that's
-    // already proven reliable, but with MORE of them and much shorter straights between
-    // - six real corners instead of four, closer together, so the course stays in a
-    // constant rhythm of committing into one bend after another instead of resting.
-    const points=[[-190,6,-155],[-100,7,-160],[-10,8,-132],[80,8,-158],[170,9,-150],[215,8,-100],[200,7,-50],[196,6,15],[158,8,58],[192,6,100],[185,7,165],[140,10,200],[75,9,195],[10,11,170],[-60,9,210],[-155,8,180],[-215,6,125],[-220,4,60],[-215,3,-95],[-205,5,-150]].map(p=>new THREE.Vector3(...p));
-    const curve=new THREE.CatmullRomCurve3(points,true,'centripetal',.45), TRACK_W=19, trackLength=curve.getLength();
+    // already proven reliable.
+    // Redesigned again once real-world top speeds landed (a 165-220mph car needs actual
+    // ROOM) - the old layout had two corners down at a 14-15m radius, which is a
+    // near-hairpin: at realistic speed the only way through one of those is braking to a
+    // near-stop first, not drifting. Measured every corner's actual radius (circumradius
+    // from sampled triplets along the curve) while redesigning this, aiming for a
+    // flowing sequence of medium sweepers a slide can actually be held through - minimum
+    // radius is now ~43m (was 14m), with a dozen distinct corners spread 43-150m across
+    // the lap instead of a couple of tight hairpins between long straight-line stretches.
+    const points=[[-230,6,-100],[-230,7,20],[-200,8,130],[-120,9,190],[-10,9,200],[90,8,175],[150,8,120],[170,7,40],[150,6,-40],[190,6,-110],[230,5,-200],[210,4,-290],[130,4,-330],[20,5,-320],[-70,6,-280],[-140,6,-220],[-190,6,-160],[-210,6,-130]].map(p=>new THREE.Vector3(...p));
+    const curve=new THREE.CatmullRomCurve3(points,true,'centripetal',.45), TRACK_W=26, trackLength=curve.getLength();
     const up=new THREE.Vector3(0,1,0), vA=new THREE.Vector3(),vB=new THREE.Vector3(),vC=new THREE.Vector3();
     function frame(u){const p=curve.getPointAt((u%1+1)%1),t=curve.getTangentAt((u%1+1)%1).normalize(),side=new THREE.Vector3().crossVectors(t,up).normalize();return{p,t,side}}
     // Real position/heading physics needs a way to project a car's actual (x,z) onto
