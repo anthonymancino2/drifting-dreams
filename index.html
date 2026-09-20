@@ -98,7 +98,15 @@
     function makeSkyTexture(){const c=document.createElement('canvas');c.width=2;c.height=256;const ctx=c.getContext('2d');const g=ctx.createLinearGradient(0,0,0,256);g.addColorStop(0,'#160c33');g.addColorStop(.42,'#3d1f72');g.addColorStop(.72,'#b23aa0');g.addColorStop(.88,'#ff6f5e');g.addColorStop(1,'#ffb15e');ctx.fillStyle=g;ctx.fillRect(0,0,2,256);const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;return tex}
     scene.background=makeSkyTexture(); scene.fog=new THREE.FogExp2(0x4a2f7a,.00095);
     const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
-    renderer.setPixelRatio(Math.min(devicePixelRatio,1.8)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.15;
+    // The third `false` tells Three not to also pin the canvas's CSS width/height via an
+    // inline style - the stylesheet's width:100%;height:100% (canvas#game above) already
+    // keeps it correctly filling the viewport, and stays correct automatically as the
+    // browser's real viewport changes (address bar collapsing on iOS, etc). Letting
+    // setSize write an inline style instead locks the canvas to whatever innerWidth/
+    // innerHeight happened to read at that instant - if that first read on iOS Safari
+    // landed before the real viewport settled, the canvas gets stuck at the wrong
+    // (smaller) size forever, showing the plain dark page background behind the rest.
+    renderer.setPixelRatio(Math.min(devicePixelRatio,1.8)); renderer.setSize(innerWidth,innerHeight,false); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.15;
     const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.08,1800); const clock=new THREE.Clock();
     const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));const bloomPass=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.5,.4,.92);composer.addPass(bloomPass);composer.addPass(new OutputPass());composer.setSize(innerWidth,innerHeight);
     scene.add(new THREE.HemisphereLight(0x9db8ff,0x4a2f6a,3.6));
@@ -246,6 +254,10 @@
     // had been extracted once before but never made it into the live build - added back
     // in per request, both as playable choices and as the AI's racing roster.
     const TYPE_BASE_SPEED=[0,58,53,36,39,33,34,59,58,60,57,45,56,55,42,38,57,44,37]; // by assetIndex: [player-only,SportsCar2,Cop,Taxi,SUV,NormalCar1,NormalCar2,fenyr,italia,lamb,ghini,coupe,kamaro,rally,armor,jeep,police,mobil,van]
+    // Kept in step with the player's own top speed (54->40, an 0.74x cut made so cars
+    // don't blow through corners faster than there's room to actually drift them) -
+    // otherwise the AI pack would suddenly be running noticeably faster than the player.
+    const AI_SPEED_SCALE=.74;
     // Only some AI cars are actual racing rivals (ranked, lap-counted) - the rest is
     // ambient traffic sharing the road but not part of the race. Without a clear marker
     // the two were indistinguishable at a glance, so racers get a floating chevron above
@@ -314,7 +326,7 @@
     function makeCar(i){const root=new THREE.Group();scene.add(root);const rosterEntry=i===0?{assetIndex:0,racer:true}:AI_ROSTER[(i-1)%AI_ROSTER.length],assetIndex=rosterEntry.assetIndex,racer=rosterEntry.racer;
       const visual=buildCarVisual(root,assetIndex,i>=7?colors[i]:null);
       if(racer&&i>0){const marker=new THREE.Sprite(markerMat);marker.scale.set(1.3,1.3,1.3);marker.position.set(0,visual.box.max.y+1.3,0);root.add(marker)}
-      const st=spawnTransform(i);const c={root,model:visual.model,wheels:visual.wheels,groundLift:visual.groundLift,sirenLights:visual.sirenLights,racer,assetIndex,position:st.position,heading:st.heading,moveHeading:st.heading,speed:0,steer:0,_lastIdx:null,lapDist:0,progress:0,lap:1,ai:i>0,base:i===0?58:TYPE_BASE_SPEED[assetIndex]+(i%3)*2.2,laneOffset:((i%3)-1)*4.5,seed:i*7.31};cars.push(c);return c}
+      const st=spawnTransform(i);const c={root,model:visual.model,wheels:visual.wheels,groundLift:visual.groundLift,sirenLights:visual.sirenLights,racer,assetIndex,position:st.position,heading:st.heading,moveHeading:st.heading,speed:0,steer:0,_lastIdx:null,lapDist:0,progress:0,lap:1,ai:i>0,base:(i===0?58:TYPE_BASE_SPEED[assetIndex]+(i%3)*2.2)*AI_SPEED_SCALE,laneOffset:((i%3)-1)*4.5,seed:i*7.31};cars.push(c);return c}
     // Re-skins the player's car in place (position/physics untouched) - used by the
     // vehicle-select screen so cycling through cars updates the live 3D preview.
     function setPlayerVehicle(assetIndex){const visual=buildCarVisual(player.root,assetIndex,null);player.model=visual.model;player.wheels=visual.wheels;player.groundLift=visual.groundLift;player.sirenLights=visual.sirenLights;player.assetIndex=assetIndex;player.rollVisual=0;
@@ -474,7 +486,7 @@
       // Whichever car was picked on the vehicle-select screen actually matters here -
       // Speed/Accel scale top speed and throttle response, Handling scales grip below.
       const sm=player.statMods||{speedMult:1,accelMult:1,handlingMult:1};
-      player.steer=THREE.MathUtils.lerp(player.steer,steerTarget,1-Math.exp(-dt*20));const boost=input.nitro&&nitro>0&&player.speed>12;if(boost)nitro=Math.max(0,nitro-dt*.24);const top=(boost?92:54)*sm.speedMult,accel=gasAmt*(boost?32:17)*sm.accelMult,brake=brakeAmt*30;
+      player.steer=THREE.MathUtils.lerp(player.steer,steerTarget,1-Math.exp(-dt*20));const boost=input.nitro&&nitro>0&&player.speed>12;if(boost)nitro=Math.max(0,nitro-dt*.24);const top=(boost?62:40)*sm.speedMult,accel=gasAmt*(boost?32:17)*sm.accelMult,brake=brakeAmt*30;
       // Arcade drift state: either the dedicated handbrake button, OR simply holding a
       // turn hard for a beat (a Mario Kart/Ridge Racer style auto-drift) - short taps
       // stay tight and drift-free (that was an explicit earlier fix), but committing to
@@ -493,15 +505,19 @@
       // Drift Thrust: a slide should carry momentum through a corner, not bleed it off -
       // inject extra forward push while committed to a drift so holding a slide never
       // feels like the "punish" it did in the old rigid-sim tuning.
-      const driftThrust=driftState&&Math.abs(player.speed)>8?(14+gasAmt*10)*sm.accelMult:0;
-      const effTop=driftState?top*1.08:top;
+      // This should only cancel the sideways-travel speed LOSS a slide naturally causes,
+      // not add a net gain on top of it - a corner you drift through should feel as fast
+      // as one you take clean, never faster, or drifting stops being a technique and
+      // starts being the only way to not run out of room before the next corner.
+      const driftThrust=driftState&&Math.abs(player.speed)>8?(6+gasAmt*4)*sm.accelMult:0;
+      const effTop=top;
       player.speed+=accel*dt+driftThrust*dt-brake*dt;player.speed-=dt*(1.05+player.speed*.01);player.speed=THREE.MathUtils.clamp(player.speed,brakeAmt>0&&gasAmt<=0?-8:0,effTop);
       // Exit Boost: the instant a drift ends and the car snaps straight again, kick
       // forward speed by 1.2-1.3x for a beat - the "pop" out of a corner that makes
       // sliding feel like the FAST way through a turn instead of just the flashy way.
       if(player._wasDrifting===undefined)player._wasDrifting=false;
       if(player._exitBoostTimer===undefined)player._exitBoostTimer=0;
-      if(player._wasDrifting&&!driftState&&Math.abs(player.speed)>10){player.speed*=1.2+Math.random()*.1;player._exitBoostTimer=.22}
+      if(player._wasDrifting&&!driftState&&Math.abs(player.speed)>10){player.speed*=1.06+Math.random()*.04;player._exitBoostTimer=.22}
       player._wasDrifting=driftState;
       if(player._exitBoostTimer>0)player._exitBoostTimer=Math.max(0,player._exitBoostTimer-dt);
       // Real heading physics: steer only changes which way the car is POINTED (yaw).
@@ -821,7 +837,12 @@
       else{raceTime+=dt;updatePlayer(dt);updateAI(dt);collisions();updateSmoke(dt);updateSkids(dt);updateCamera(dt);updateHUD()}
       composer.render()}
     tick();
-    addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));composer.setSize(innerWidth,innerHeight);bloomPass.setSize(innerWidth,innerHeight)});
+    function resizeRenderer(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false);renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));composer.setSize(innerWidth,innerHeight);bloomPass.setSize(innerWidth,innerHeight)}
+    addEventListener('resize',resizeRenderer);
+    // iOS Safari doesn't reliably fire 'resize' when its own address bar/toolbar
+    // collapses or expands (the most common way the visible viewport changes without an
+    // actual orientation change) - visualViewport does, so re-sync on that too.
+    if(window.visualViewport)visualViewport.addEventListener('resize',resizeRenderer);
   </script>
 </body>
 </html>
