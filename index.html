@@ -505,24 +505,26 @@
       // hold time across the flip, or normal hard cornering would auto-drift too.
       if(committedSteer&&steerSign===player._driftHoldSign&&Math.abs(player.speed)>10){player._driftHoldTime+=dt}
       else{player._driftHoldTime=0;player._driftHoldSign=steerSign}
-      const autoDrift=player._driftHoldTime>.28&&Math.abs(player.speed)>10;
+      const autoDrift=player._driftHoldTime>.22&&Math.abs(player.speed)>10;
       const driftState=input.drift||autoDrift;
-      // Drift Thrust: a slide should carry momentum through a corner, not bleed it off -
-      // inject extra forward push while committed to a drift so holding a slide never
-      // feels like the "punish" it did in the old rigid-sim tuning.
-      // This should only cancel the sideways-travel speed LOSS a slide naturally causes,
-      // not add a net gain on top of it - a corner you drift through should feel as fast
-      // as one you take clean, never faster, or drifting stops being a technique and
-      // starts being the only way to not run out of room before the next corner.
-      const driftThrust=driftState&&Math.abs(player.speed)>8?(6+gasAmt*4)*sm.accelMult:0;
-      const effTop=top;
+      // This is an arcade drift game, not a simulator - drifting is now the explicitly
+      // REWARDED way to corner, and driving/turning "normal" (not drifting) is the
+      // deliberately weaker option, not just a neutral baseline. Steering hard WITHOUT
+      // committing to a drift costs real top speed (up to half of it, scaling with how
+      // hard you're turning) - the arcade version of understeer/scrub - while actually
+      // drifting instead grants a strong ceiling BONUS on top of normal top speed, plus
+      // a big forward thrust so the slide accelerates through the corner instead of just
+      // maintaining pace. Committing to the slide should clearly be the fast line.
+      const cornerCut=driftState?0:Math.abs(player.steer)*.5,driftBonus=driftState?1.35:1;
+      const driftThrust=driftState&&Math.abs(player.speed)>8?(16+gasAmt*8)*sm.accelMult:0;
+      const effTop=top*(1-cornerCut)*driftBonus;
       player.speed+=accel*dt+driftThrust*dt-brake*dt;player.speed-=dt*(1.05+player.speed*.01);player.speed=THREE.MathUtils.clamp(player.speed,brakeAmt>0&&gasAmt<=0?-8:0,effTop);
       // Exit Boost: the instant a drift ends and the car snaps straight again, kick
-      // forward speed by 1.2-1.3x for a beat - the "pop" out of a corner that makes
-      // sliding feel like the FAST way through a turn instead of just the flashy way.
+      // forward speed for a beat - the "pop" out of a corner that makes sliding feel like
+      // the FAST way through a turn instead of just the flashy way.
       if(player._wasDrifting===undefined)player._wasDrifting=false;
       if(player._exitBoostTimer===undefined)player._exitBoostTimer=0;
-      if(player._wasDrifting&&!driftState&&Math.abs(player.speed)>10){player.speed*=1.06+Math.random()*.04;player._exitBoostTimer=.22}
+      if(player._wasDrifting&&!driftState&&Math.abs(player.speed)>10){player.speed*=1.1+Math.random()*.06;player._exitBoostTimer=.22}
       player._wasDrifting=driftState;
       if(player._exitBoostTimer>0)player._exitBoostTimer=Math.max(0,player._exitBoostTimer-dt);
       // Real heading physics: steer only changes which way the car is POINTED (yaw).
@@ -538,36 +540,38 @@
       // steering right off the start line, or right after slowing for a corner, felt
       // muted/laggy before speed built back up. Higher floor, reached sooner.
       const speedAbs=Math.abs(player.speed),speedFactor=Math.max(.6,Math.min(1,speedAbs/5)),dirSign=player.speed>=0?1:-1;
-      // Front wheels stay sharp even mid-slide - the pivot should feel crisp, only the
-      // rear lets go. A small turn-rate bump while drifting keeps the nose responsive so
-      // the car can be aimed through the exit instead of just coasting sideways.
-      player.heading+=player.steer*4.4*(driftState?1.15:1)*speedFactor*dirSign*dt;
+      // Front wheels stay sharp even mid-slide, and normal (non-drift) turning is now
+      // deliberately duller by comparison - pushing the contrast between "just turning"
+      // and "committing to a slide" as far as it'll go without becoming unplayable.
+      player.heading+=player.steer*4.4*(driftState?1.5:.8)*speedFactor*dirSign*dt;
       // A real fishtail is a SNAP, not a gradual lean - committing to a drift (handbrake
       // OR the auto-drift hold above) should whip the front away from the rear instantly
       // (weight transfer breaking the rear tires loose all at once), not just slowly
       // lower the grip number. Apply that as a one-time kick to heading the instant the
       // drift state is freshly entered, on top of the much lower sustained grip below.
+      // This is intentionally extreme, not realistic - the point is a huge, showy slide.
       if(player._prevDrift===undefined)player._prevDrift=false;
-      if(driftState&&!player._prevDrift&&speedAbs>10&&Math.abs(steerTarget)>.1)player.heading+=steerTarget*.55*dirSign;
+      if(driftState&&!player._prevDrift&&speedAbs>10&&Math.abs(steerTarget)>.1)player.heading+=steerTarget*.95*dirSign;
       player._prevDrift=driftState;
       // Cap how far heading can get ahead of moveHeading - without this, holding full
       // lock through a long drift just keeps winding heading up past moveHeading forever,
       // eventually spinning the car most of the way around (a spin-out, not a fishtail).
-      // Clamping the gap keeps the slide wide (up to ~70 degrees) and dramatic without
-      // ever letting it become a donut/spin-out.
-      const rawGap=angDelta(player.moveHeading,player.heading),maxGap=1.22;
+      // Pushed out to ~86 degrees (from ~70) for a near-sideways, Tokyo-Drift-style slide
+      // - this is not meant to look like a real car's slip angle, it's meant to look
+      // extreme, while the clamp still stops it from ever becoming a full spin-out.
+      const rawGap=angDelta(player.moveHeading,player.heading),maxGap=1.5;
       if(Math.abs(rawGap)>maxGap)player.heading=player.moveHeading+Math.sign(rawGap)*maxGap;
       // Normal steering should feel planted - grip only drops (a lot) while actually
-      // drifting. A moderate non-drift grip made even ordinary cornering slide
-      // noticeably, which read as the car drifting on its own instead of drifting being
-      // something you choose to do. Handling only scales the fully-planted half - the
-      // drift grip itself (.55, an ~80%+ cut in rear lateral traction) stays identical
-      // across every car, since that's the one thing every car in a drift game needs to
-      // be equally good at. Releasing a drift doesn't snap back instantly either - a
-      // short "recovery grip" window (driven by the same exit-boost timer) lerps the
-      // slide closed over roughly 10-15 frames so straightening out reads as a smooth
-      // catch, not a jolt, before full normal grip takes back over.
-      const grip=driftState?.55:(player._exitBoostTimer>0?5:20*sm.handlingMult);
+      // drifting. Drift grip cut hard again (.55 -> .28, now an ~85%+ cut in rear lateral
+      // traction) so moveHeading lags heading much longer, holding the big sideways slide
+      // for longer instead of quickly catching back up to it. Handling only scales the
+      // fully-planted half - the drift grip itself stays identical across every car,
+      // since that's the one thing every car in a drift game needs to be equally good
+      // at. Releasing a drift doesn't snap back instantly either - a short "recovery
+      // grip" window (driven by the same exit-boost timer) lerps the slide closed over
+      // roughly 10-15 frames so straightening out reads as a smooth catch, not a jolt,
+      // before full normal grip takes back over.
+      const grip=driftState?.28:(player._exitBoostTimer>0?4:20*sm.handlingMult);
       player.moveHeading=angDamp(player.moveHeading,player.heading,grip,dt);
       player.position.x+=Math.sin(player.moveHeading)*player.speed*dt;
       player.position.z+=Math.cos(player.moveHeading)*player.speed*dt;
@@ -598,10 +602,10 @@
       // straight to win. A small passive trickle keeps a car that never drifts at all
       // from being permanently stuck at zero, but it's far too slow to rely on.
       if(!boost){
-        if(sliding)nitro=Math.min(1,nitro+driftMag*speedAbs*.0055*dt);
-        nitro=Math.min(1,nitro+dt*.012);
+        if(sliding)nitro=Math.min(1,nitro+driftMag*speedAbs*.009*dt);
+        nitro=Math.min(1,nitro+dt*.006);
       }
-      if(sliding){const pts=Math.round(driftMag*speedAbs*7.5);driftScore+=pts;totalScore+=pts;lastPuff-=dt;if(lastPuff<=0){const puffScale=1.1+Math.min(1,driftMag)*.9,hs=Math.sin(player.heading),hc=Math.cos(player.heading),bx=-hs*1.65,bz=-hc*1.65,sx=hc*.78,sz=-hs*.78;puff(vA.set(player.position.x+bx-sx,player.position.y+.3,player.position.z+bz-sz),puffScale);puff(vB.set(player.position.x+bx+sx,player.position.y+.3,player.position.z+bz+sz),puffScale);lastPuff=.026}
+      if(sliding){const pts=Math.round(driftMag*speedAbs*11);driftScore+=pts;totalScore+=pts;lastPuff-=dt;if(lastPuff<=0){const puffScale=1.1+Math.min(1,driftMag)*.9,hs=Math.sin(player.heading),hc=Math.cos(player.heading),bx=-hs*1.65,bz=-hc*1.65,sx=hc*.78,sz=-hs*.78;puff(vA.set(player.position.x+bx-sx,player.position.y+.3,player.position.z+bz-sz),puffScale);puff(vB.set(player.position.x+bx+sx,player.position.y+.3,player.position.z+bz+sz),puffScale);lastPuff=.026}
         // Skid marks are triggered by DISTANCE travelled, not a fixed timer - ties mark
         // density to actual ground covered (not frame rate or speed), so the fixed pool
         // above gets spent on a predictable, consistent trail length instead of firing
@@ -614,19 +618,20 @@
     // (including the one that becomes the player) with the exact same logic, instead of
     // needing a second, drifting-out-of-sync copy of the AI behavior.
     function driveAI(c,dt){const info=nearestSample(c.position,c._sampleHint);c._sampleHint=info.index;const lookAhead=9+Math.abs(c.speed)*.35,preferredLane=c.laneOffset+Math.sin(raceTime*.15+c.seed)*1.1,tp=pointAtArc(info.arc+lookAhead,preferredLane),dx=tp.x-c.position.x,dz=tp.z-c.position.z,desiredHeading=Math.atan2(dx,dz),err=angDelta(c.heading,desiredHeading);c.position.y=THREE.MathUtils.lerp(c.position.y,info.y,1-Math.exp(-dt*22));c.steer=THREE.MathUtils.clamp(err*2.4,-1,1);
-      // AI used to hold its cruise speed through a corner no matter how sharp, using
-      // steering (and now drift) alone to stay on the racing line - on tame corners
-      // that's fine, but on these tighter ones it made the AI cling to the ideal line
-      // at full speed in a way a slowing, sliding human never could, which read as the
-      // AI simply being unbeatable rather than just fast. Scale target speed down by how
-      // hard it's having to turn, same signal that already drives its own drift.
-      const target=c.base*(1-Math.abs(c.steer)*.32)+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.8*speedFactor*dt;
       // AI should drift too, not just corner cleanly - when it commits hard into a turn
       // at real speed, drop its own grip the same way the player's handbrake does, so
       // the tail visibly steps out through corners instead of just steering like it's on
       // rails. Straights/gentle curves keep the tighter grip so it still drives sanely.
-      const aiCornering=Math.abs(c.steer)>.42&&Math.abs(c.speed)>18;
-      c.moveHeading=angDamp(c.moveHeading,c.heading,aiCornering?4.2:13,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}
+      const aiCornering=Math.abs(c.steer)>.34&&Math.abs(c.speed)>18;
+      // Same reward/penalty split as the player: cornering WITHOUT committing to a slide
+      // costs real speed (arcade understeer), while actually drifting grants a speed
+      // bonus instead of the old flat cut - normal driving/turning should read as
+      // visibly slower than a bot that's actually sliding through the corner.
+      const cornerCut=aiCornering?0:Math.abs(c.steer)*.5,driftBonus=aiCornering?1.25:1;
+      const target=c.base*(1-cornerCut)*driftBonus+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.8*(aiCornering?1.4:.85)*speedFactor*dt;
+      // Grip cut hard here too (was 4.2, matching the player's .55->.28 cut) so the AI's
+      // slide holds for longer and reads as just as extreme as the player's.
+      c.moveHeading=angDamp(c.moveHeading,c.heading,aiCornering?2.1:13,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}
       // Same fix as the player's threshold below - only show smoke/skid marks for a
       // slide big enough to actually read as one, not every minor angle its normal
       // (non-cornering) grip can produce on its own.
