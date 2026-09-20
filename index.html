@@ -183,7 +183,7 @@
 
     let mode='menu',raceTime=0,countdown=3.7,nitro=1,driftScore=0,totalScore=0,lastPuff=0;
     cars.forEach(c=>placeCar(c));
-    function updatePlayer(dt){const steerTarget=(input.right?1:0)-(input.left?1:0);player.steer=THREE.MathUtils.lerp(player.steer,steerTarget,1-Math.exp(-dt*13));const boost=input.nitro&&nitro>0&&player.speed>12;if(boost)nitro=Math.max(0,nitro-dt*.24);else nitro=Math.min(1,nitro+dt*.055);const top=boost?86:64,accel=input.gas?(boost?26:19):0,brake=input.brake?30:0;player.speed+=accel*dt-brake*dt;player.speed-=dt*(1.05+player.speed*.01);player.speed=THREE.MathUtils.clamp(player.speed,input.brake&&!input.gas?-8:0,top);
+    function updatePlayer(dt){const steerTarget=(input.left?1:0)-(input.right?1:0);player.steer=THREE.MathUtils.lerp(player.steer,steerTarget,1-Math.exp(-dt*13));const boost=input.nitro&&nitro>0&&player.speed>12;if(boost)nitro=Math.max(0,nitro-dt*.24);else nitro=Math.min(1,nitro+dt*.055);const top=boost?86:64,accel=input.gas?(boost?26:19):0,brake=input.brake?30:0;player.speed+=accel*dt-brake*dt;player.speed-=dt*(1.05+player.speed*.01);player.speed=THREE.MathUtils.clamp(player.speed,input.brake&&!input.gas?-8:0,top);
       // Real heading physics: steer only changes which way the car is POINTED (yaw).
       // moveHeading (actual travel direction) chases heading at a grip-dependent rate -
       // near-instant normally (so you go where you point), much slower while drifting
