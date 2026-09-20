@@ -589,13 +589,15 @@
       const info=nearestSample(player.position,player._sampleHint);player._sampleHint=info.index;const halfW=TRACK_W*.86,wallLimit=TRACK_W+2.5,absLat=Math.abs(info.lateral);player.position.y=THREE.MathUtils.lerp(player.position.y,info.y,1-Math.exp(-dt*22));
       if(absLat>halfW){const excess=Math.min(absLat,wallLimit)-halfW;player.speed-=(2+excess*.8)*dt}
       if(absLat>wallLimit){const dir=Math.sign(info.lateral),s=SAMPLES[info.index];player.position.x=s.p.x+info.side.x*wallLimit*dir;player.position.z=s.p.z+info.side.z*wallLimit*dir;
-        // A wall you can get physically stuck facing into (nothing was ever pulling
-        // heading back toward the track) means "just hold forward" never recovers -
-        // you need to know to counter-steer, which most players won't guess mid-crash.
-        // Nudge heading/moveHeading toward the track's own direction here, like a guide
-        // rail, so holding forward alone naturally redirects the car back onto the road.
+        // Only nudge moveHeading (actual travel direction) toward the track, as a guide
+        // rail so holding forward alone naturally redirects the car back onto the road -
+        // NEVER touch player.heading, which is the player's own steering input. This used
+        // to also force-correct heading itself, which meant simply running a little wide
+        // on an ordinary turn (nowhere near a real crash) could yank the car's heading
+        // back against the player's own held input - reported as "I turn left and the
+        // car countersteers on its own" during completely normal driving, no brakes
+        // involved. The player's steering should never be overridden by the game itself.
         const trackHeading=Math.atan2(s.t.x,s.t.z);
-        player.heading=angDamp(player.heading,trackHeading,3,dt);
         player.moveHeading=angDamp(player.moveHeading,trackHeading,5,dt);player._driftActive=false;player._recoverTimer=.3
       }
       updateLapProgress(player,info);
