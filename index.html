@@ -105,11 +105,13 @@
     const sunBarMat=new THREE.MeshBasicMaterial({color:0x160c33}); for(let i=0;i<5;i++){const bw=76-i*4,bh=2.6+i*.9,bar=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,4),sunBarMat);bar.position.set(-180,44+i*7.2,-419);scene.add(bar)}
     const grid=new THREE.Mesh(new THREE.PlaneGeometry(2000,2000,40,40),new THREE.MeshBasicMaterial({color:0xff2fd0,wireframe:true,transparent:true,opacity:.22})); grid.rotation.x=-Math.PI/2; grid.position.y=-4.4; scene.add(grid);
 
-    // A rounded-rectangle circuit with real corners and one chicane, instead of either a
-    // sharp hairpin or one continuous gentle sweep - straights to build speed on, then an
-    // actual ~45-65 degree corner to commit the tail into, which is what a drift track
-    // needs (a smooth oval never demands enough direction change to want to slide).
-    const points=[[-180,6,-140],[0,8,-145],[150,10,-140],[210,9,-110],[215,7,-20],[210,5,90],[150,6,155],[60,9,175],[-20,11,150],[-70,8,175],[-150,6,150],[-210,4,90],[-215,3,-20],[-200,5,-110]].map(p=>new THREE.Vector3(...p));
+    // A single entry+apex point pair per corner, with long straights on either side,
+    // measured out at only ~60-90 degrees spread over ~190 units of track - Catmull-Rom
+    // smooths a corner using ITS NEIGHBORS, so one apex point between two long straights
+    // just gets rounded into a long, gentle arc, not a tight corner. Each corner here is
+    // instead a tight 3-point cluster (pre/apex/post, ~40-90 units apart) so the sharp
+    // local direction change dominates while the far-off straight points don't smear it.
+    const points=[[-190,6,-155],[170,9,-150],[215,8,-100],[200,7,-50],[185,7,165],[140,10,200],[75,9,195],[10,11,170],[-60,9,210],[-155,8,180],[-215,6,125],[-220,4,60],[-215,3,-95],[-205,5,-150]].map(p=>new THREE.Vector3(...p));
     const curve=new THREE.CatmullRomCurve3(points,true,'centripetal',.45), TRACK_W=19, trackLength=curve.getLength();
     const up=new THREE.Vector3(0,1,0), vA=new THREE.Vector3(),vB=new THREE.Vector3(),vC=new THREE.Vector3();
     function frame(u){const p=curve.getPointAt((u%1+1)%1),t=curve.getTangentAt((u%1+1)%1).normalize(),side=new THREE.Vector3().crossVectors(t,up).normalize();return{p,t,side}}
@@ -175,7 +177,14 @@
     // would falsely award laps. Instead accumulate the shortest wrap-aware step between
     // consecutive nearest-sample indices, so only sustained net forward travel around
     // the whole loop - not position noise - completes a lap.
-    function updateLapProgress(c,info){if(c._lastIdx===null){c._lastIdx=info.index;return}let d=info.index-c._lastIdx;if(d>SAMPLE_N/2)d-=SAMPLE_N;else if(d<-SAMPLE_N/2)d+=SAMPLE_N;c._lastIdx=info.index;c.lapDist=Math.max(0,c.lapDist+d);if(c.lapDist>=SAMPLE_N){c.lap=Math.min(3,c.lap+1);c.lapDist-=SAMPLE_N}c.progress=c.lap*TRACK_LEN+(c.lapDist/SAMPLE_N)*TRACK_LEN}
+    function updateLapProgress(c,info){if(c._lastIdx===null){c._lastIdx=info.index;return}let d=info.index-c._lastIdx;if(d>SAMPLE_N/2)d-=SAMPLE_N;else if(d<-SAMPLE_N/2)d+=SAMPLE_N;c._lastIdx=info.index;c.lapDist=Math.max(0,c.lapDist+d);
+      // c.lap must NOT be capped at 3 here even though the race is "3 laps" and the HUD
+      // only ever shows "x/3" - capping it here while lapDist keeps wrapping made
+      // progress cycle back down every lap once a car passed lap 3 (lap pinned at 3,
+      // lapDist still resetting to 0 each loop), corrupting the position ranking for
+      // anyone who'd already finished. Let lap count truthfully forever; clamp only
+      // where it's actually displayed.
+      if(c.lapDist>=SAMPLE_N){c.lap+=1;c.lapDist-=SAMPLE_N}c.progress=c.lap*TRACK_LEN+(c.lapDist/SAMPLE_N)*TRACK_LEN}
     function ribbon(width,yOffset,material,segments=720){const pos=[],uv=[],idx=[];for(let i=0;i<=segments;i++){const u=i/segments,{p,side}=frame(u);for(const x of [-1,1]){vA.copy(p).addScaledVector(side,width*x).y+=yOffset;pos.push(vA.x,vA.y,vA.z);uv.push((x+1)/2,u*65)}}for(let i=0;i<segments;i++){const a=i*2;idx.push(a,a+2,a+1,a+1,a+2,a+3)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();const m=new THREE.Mesh(g,material);m.receiveShadow=true;scene.add(m);return m}
     const ground=new THREE.Mesh(new THREE.CircleGeometry(720,96),new THREE.MeshStandardMaterial({color:0x120a20,roughness:.95}));ground.rotation.x=-Math.PI/2;ground.position.y=-4.5;ground.receiveShadow=true;scene.add(ground);
     ribbon(TRACK_W+3,-.18,new THREE.MeshStandardMaterial({color:0x8a84b8,roughness:.85,side:THREE.DoubleSide}));ribbon(TRACK_W,0,new THREE.MeshStandardMaterial({color:0x4d4670,roughness:.7,metalness:.15,side:THREE.DoubleSide}));
@@ -220,7 +229,14 @@
 
     const cars=[], colors=[0xffc400,0xe73635,0x178cff,0x15cc87,0xa754ee,0xff6b1b,0xf1f1f1,0x222a38,0xff4fb7,0x4bdbe8,0xb4db38,0x9f694c];
     const WHEEL_AXIS=new THREE.Vector3(1,0,0),wheelQ=new THREE.Quaternion();
-    const TYPE_BASE_SPEED=[0,49,41,36,39,33,34]; // by assetIndex: [player-only, SportsCar2, Cop, Taxi, SUV, NormalCar1, NormalCar2] - scaled to match the player's lower top speed
+    // SportsCar2/Cop are the only two RACER opponents (see isRacerAsset below) - everyone
+    // else here is ambient traffic, not competition. Those two used to cruise at 49/41,
+    // both well under the player's plain non-boosted top speed (54, scaled 43-65 by car
+    // choice) - meaning a player could win without ever touching nitro, so drifting (the
+    // only way to charge nitro) was never actually necessary. Raised so both regularly
+    // sit AT OR ABOVE a typical non-boosted player, forcing real use of the boost - which
+    // only drifting fuels - to keep up or pass, not just for a score multiplier.
+    const TYPE_BASE_SPEED=[0,63,57,36,39,33,34]; // by assetIndex: [player-only, SportsCar2, Cop, Taxi, SUV, NormalCar1, NormalCar2]
     // Only some AI cars are actual racing rivals (ranked, lap-counted) - the sporty and
     // cop models. Everything else (taxi/SUV/normal cars) is ambient traffic, sharing the
     // road but not part of the race. Without a clear marker the two were indistinguishable
@@ -462,12 +478,25 @@
     // Pulled out of updateAI's loop body so the attract-mode demo can drive EVERY car
     // (including the one that becomes the player) with the exact same logic, instead of
     // needing a second, drifting-out-of-sync copy of the AI behavior.
-    function driveAI(c,dt){const info=nearestSample(c.position,c._sampleHint);c._sampleHint=info.index;const lookAhead=9+Math.abs(c.speed)*.35,preferredLane=c.laneOffset+Math.sin(raceTime*.15+c.seed)*1.1,tp=pointAtArc(info.arc+lookAhead,preferredLane),dx=tp.x-c.position.x,dz=tp.z-c.position.z,desiredHeading=Math.atan2(dx,dz),err=angDelta(c.heading,desiredHeading);c.position.y=THREE.MathUtils.lerp(c.position.y,info.y,1-Math.exp(-dt*22));c.steer=THREE.MathUtils.clamp(err*2.4,-1,1);const target=c.base+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.0*speedFactor*dt;c.moveHeading=angDamp(c.moveHeading,c.heading,13,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}updateLapProgress(c,info);placeCar(c,dt)}
+    function driveAI(c,dt){const info=nearestSample(c.position,c._sampleHint);c._sampleHint=info.index;const lookAhead=9+Math.abs(c.speed)*.35,preferredLane=c.laneOffset+Math.sin(raceTime*.15+c.seed)*1.1,tp=pointAtArc(info.arc+lookAhead,preferredLane),dx=tp.x-c.position.x,dz=tp.z-c.position.z,desiredHeading=Math.atan2(dx,dz),err=angDelta(c.heading,desiredHeading);c.position.y=THREE.MathUtils.lerp(c.position.y,info.y,1-Math.exp(-dt*22));c.steer=THREE.MathUtils.clamp(err*2.4,-1,1);const target=c.base+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.8*speedFactor*dt;
+      // AI should drift too, not just corner cleanly - when it commits hard into a turn
+      // at real speed, drop its own grip the same way the player's handbrake does, so
+      // the tail visibly steps out through corners instead of just steering like it's on
+      // rails. Straights/gentle curves keep the tighter grip so it still drives sanely.
+      const aiCornering=Math.abs(c.steer)>.42&&Math.abs(c.speed)>18;
+      c.moveHeading=angDamp(c.moveHeading,c.heading,aiCornering?4.2:13,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}
+      const aiDriftMag=Math.abs(angDelta(c.moveHeading,c.heading));
+      if(aiDriftMag>.12&&Math.abs(c.speed)>15){
+        if(c._lastPuff===undefined)c._lastPuff=0;
+        c._lastPuff-=dt;
+        if(c._lastPuff<=0){const hs=Math.sin(c.heading),hc=Math.cos(c.heading),bx=-hs*1.5,bz=-hc*1.5,sx=hc*.7,sz=-hs*.7;puff(vA.set(c.position.x+bx-sx,c.position.y+.3,c.position.z+bz-sz),.85);puff(vB.set(c.position.x+bx+sx,c.position.y+.3,c.position.z+bz+sz),.85);c._lastPuff=.06}
+      }
+      updateLapProgress(c,info);placeCar(c,dt)}
     function updateAI(dt){for(let i=1;i<cars.length;i++)driveAI(cars[i],dt)}
     function updateAttractDrive(dt){for(let i=0;i<cars.length;i++)driveAI(cars[i],dt)}
     function collisions(){for(let i=1;i<cars.length;i++){const c=cars[i],dx=c.position.x-player.position.x,dz=c.position.z-player.position.z,dist=Math.hypot(dx,dz);if(dist<3.2&&dist>.001){const nx=dx/dist,nz=dz/dist;player.speed*=.93;player.position.x-=nx*.12;player.position.z-=nz*.12;c.position.x+=nx*.12;c.position.z+=nz*.12}}}
     const camTarget=new THREE.Vector3(),camDesired=new THREE.Vector3(),look=new THREE.Vector3();
-    function updateCamera(dt){const hs=Math.sin(player.heading),hc=Math.cos(player.heading),tx=hs,tz=hc,sx=-hc,sz=hs,speedAbs=Math.abs(player.speed);camTarget.set(player.position.x,player.position.y+1.15,player.position.z);let distance=11.5+Math.min(speedAbs,90)*.045,height=4.6,yaw=orbitYaw;if(camMode===1){camDesired.set(player.position.x+tx*1.1,player.position.y+1.22,player.position.z+tz*1.1);look.set(player.position.x+tx*18,player.position.y+.7,player.position.z+tz*18)}else{if(camMode===0&&!dragging){yaw=THREE.MathUtils.lerp(yaw,0,1-Math.exp(-dt*4));orbitYaw=yaw;orbitPitch=THREE.MathUtils.lerp(orbitPitch,.2,dt*2)}if(camMode===2){distance=12.5;height=2.4+Math.sin(orbitPitch)*7}const behindScale=-Math.cos(yaw)*distance,acrossScale=Math.sin(yaw)*distance;camDesired.set(camTarget.x+tx*behindScale+sx*acrossScale,camTarget.y+height,camTarget.z+tz*behindScale+sz*acrossScale);look.copy(camTarget)}
+    function updateCamera(dt){const hs=Math.sin(player.heading),hc=Math.cos(player.heading),tx=hs,tz=hc,sx=-hc,sz=hs,speedAbs=Math.abs(player.speed);camTarget.set(player.position.x,player.position.y+1.15,player.position.z);let distance=7.2+Math.min(speedAbs,90)*.028,height=3.05,yaw=orbitYaw;if(camMode===1){camDesired.set(player.position.x+tx*1.1,player.position.y+1.22,player.position.z+tz*1.1);look.set(player.position.x+tx*18,player.position.y+.7,player.position.z+tz*18)}else{if(camMode===0&&!dragging){yaw=THREE.MathUtils.lerp(yaw,0,1-Math.exp(-dt*4));orbitYaw=yaw;orbitPitch=THREE.MathUtils.lerp(orbitPitch,.2,dt*2)}if(camMode===2){distance=12.5;height=2.4+Math.sin(orbitPitch)*7}const behindScale=-Math.cos(yaw)*distance,acrossScale=Math.sin(yaw)*distance;camDesired.set(camTarget.x+tx*behindScale+sx*acrossScale,camTarget.y+height,camTarget.z+tz*behindScale+sz*acrossScale);look.copy(camTarget)}
       // Top speed was toned down (drift, not top speed, is the point now), so the sense
       // of speed has to come from the camera/screen instead of a big number - a bigger
       // shake, faster FOV widening, and the radial streak overlay below all kick in
@@ -537,7 +566,7 @@
     }
     function drawMap(){const w=map.width,h=map.height,pad=28,s=Math.min((w-pad*2)/(maxX-minX),(h-pad*2)/(maxZ-minZ)),xy=p=>[w/2+(p.x-(minX+maxX)/2)*s,h/2+(p.z-(minZ+maxZ)/2)*s];ctx.clearRect(0,0,w,h);ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle='rgba(210,240,242,.9)';ctx.lineWidth=9;ctx.beginPath();mapPts.forEach((p,i)=>{const [x,y]=xy(p);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.closePath();ctx.stroke();for(let i=1;i<cars.length;i++){const [x,y]=xy(cars[i].position);ctx.fillStyle=cars[i].racer?'#ff674f':'rgba(200,210,220,.4)';ctx.beginPath();ctx.arc(x,y,cars[i].racer?4:2.2,0,7);ctx.fill()}const [x,y]=xy(player.position);ctx.fillStyle='#ffd31d';ctx.beginPath();ctx.arc(x,y,7,0,7);ctx.fill()}
     function formatTime(s){const m=Math.floor(s/60),sec=Math.floor(s%60),ms=Math.floor(s%1*1000);return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')+'.'+String(ms).padStart(3,'0')}
-    function updateHUD(){const mph=Math.round(Math.abs(player.speed)*2.23694),gear=mph<2?'N':Math.min(6,Math.max(1,Math.ceil(mph/27))),racerCount=cars.filter(c=>c.racer).length,ahead=cars.filter((c,i)=>i&&c.racer&&c.progress>player.progress).length;$('speed').textContent=mph;$('gear').textContent=gear;$('time').textContent=formatTime(raceTime);$('lap').textContent='LAP '+player.lap+'/3';$('position').innerHTML=(ahead+1)+'<span>/'+racerCount+'</span>';$('driftScore').textContent=driftScore;$('nitroFill').style.height=(nitro*94)+'%';drawSpeedGauge(mph,input.nitro&&nitro>0);drawMap();
+    function updateHUD(){const mph=Math.round(Math.abs(player.speed)*2.23694),gear=mph<2?'N':Math.min(6,Math.max(1,Math.ceil(mph/27))),racerCount=cars.filter(c=>c.racer).length,ahead=cars.filter((c,i)=>i&&c.racer&&c.progress>player.progress).length;$('speed').textContent=mph;$('gear').textContent=gear;$('time').textContent=formatTime(raceTime);$('lap').textContent='LAP '+Math.min(3,player.lap)+'/3';$('position').innerHTML=(ahead+1)+'<span>/'+racerCount+'</span>';$('driftScore').textContent=driftScore;$('nitroFill').style.height=(nitro*94)+'%';drawSpeedGauge(mph,input.nitro&&nitro>0);drawMap();
       $('debugReadout').textContent='L:'+(input.left?1:0)+' R:'+(input.right?1:0)+' steer:'+player.steer.toFixed(2)+' heading:'+(player.heading*180/Math.PI%360).toFixed(0)+'° cam:'+camMode+' yaw:'+(orbitYaw*180/Math.PI).toFixed(0)+'°';
     }
     function resetRace(){raceTime=0;countdown=3.7;nitro=1;driftScore=totalScore=0;camMode=0;orbitYaw=0;orbitPitch=.22;dragging=false;$('camLabel').textContent='CAM: CHASE · DRAG TO ORBIT';cars.forEach((c,i)=>{const st=spawnTransform(i);c.position.copy(st.position);c.heading=st.heading;c.moveHeading=st.heading;c.speed=0;c.steer=0;c._lastIdx=null;c._sampleHint=null;c.lapDist=0;c.progress=0;c.lap=1;placeCar(c)});mode='countdown';$('hud').classList.add('on');showScreen(null)}
