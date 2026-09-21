@@ -362,7 +362,9 @@
       // made the car visibly jitter/oscillate ("rocking like a boat") whenever those
       // inputs changed quickly - which, after the steering got snappier, was constantly.
       if(c.rollVisual===undefined)c.rollVisual=0;
-      const targetRoll=THREE.MathUtils.clamp(-c.steer*.045-driftAngle*.09,-.13,.13);
+      // Roll pushed much further (was capped at ~7 degrees, now ~20) so a big slide
+      // actually reads as dramatic visually, not just in the underlying angle math.
+      const targetRoll=THREE.MathUtils.clamp(-c.steer*.06-driftAngle*.16,-.35,.35);
       c.rollVisual=THREE.MathUtils.lerp(c.rollVisual,targetRoll,1-Math.exp(-dt*10));
       c.root.rotation.z=c.rollVisual;
       for(const w of c.wheels){w.spin-=c.speed*dt/.47;w.mesh.quaternion.copy(w.baseQ).multiply(wheelQ.setFromAxisAngle(WHEEL_AXIS,w.spin));w.pivot.rotation.y=w.front?c.steer*.52:0}
@@ -561,11 +563,18 @@
         // from the very first frame, not ease into it.
         player.yawRate+=player._driftDir*.95;
       }
-      const endDrift=player._driftActive&&(!input.drift||player.speed<7);
+      const releasedByPlayer=!input.drift,speedCollapsed=player.speed<7;
+      const endDrift=player._driftActive&&(releasedByPlayer||speedCollapsed);
       if(endDrift){
         player._driftActive=false;player._recoverTimer=.58;
         const charge=player._driftCharge;
-        if(charge>=.55){
+        // Only reward a drift the player actually CHOSE to end (released the handbrake).
+        // If it ended because speed collapsed while they were STILL holding the
+        // handbrake, that's a wall hit/crash, not a finished drift - awarding the same
+        // mini-turbo payout for that read as "every time I crash I get a slingshot
+        // boost," since a crash-then-recover was handing out the identical reward a
+        // clean release gets.
+        if(releasedByPlayer&&charge>=.55){
           const tier=charge>=2.15?3:charge>=1.2?2:1;
           player._miniBoostTimer=[0,.42,.7,1.0][tier];
           player._miniBoostStrength=[0,6.5,8.5,11][tier];
@@ -680,7 +689,13 @@
     const CHASE_DIST=6.4,CHASE_HEIGHT=2.35,CHASE_FOV=68;
     function updateCamera(dt){const speedAbs=Math.abs(player.speed),cameraHeading=camMode===0?player.heading+angDelta(player.heading,player.moveHeading)*.78:player.heading,hs=Math.sin(cameraHeading),hc=Math.cos(cameraHeading),tx=hs,tz=hc,sx=-hc,sz=hs;camTarget.set(player.position.x,player.position.y+1.15,player.position.z);let distance=CHASE_DIST,height=CHASE_HEIGHT,yaw=orbitYaw;if(camMode===1){const bh=Math.sin(player.heading),bc=Math.cos(player.heading);camDesired.set(player.position.x+bh*1.1,player.position.y+1.22,player.position.z+bc*1.1);look.set(player.position.x+bh*18,player.position.y+.7,player.position.z+bc*18)}else{if(camMode===0&&!dragging){yaw=THREE.MathUtils.lerp(yaw,0,1-Math.exp(-dt*4));orbitYaw=yaw;orbitPitch=THREE.MathUtils.lerp(orbitPitch,.2,dt*2)}if(camMode===2){distance=12.5;height=2.4+Math.sin(orbitPitch)*7}const behindScale=-Math.cos(yaw)*distance,acrossScale=Math.sin(yaw)*distance;camDesired.set(camTarget.x+tx*behindScale+sx*acrossScale,camTarget.y+height,camTarget.z+tz*behindScale+sz*acrossScale);if(camMode===0)look.set(camTarget.x+tx*4,camTarget.y,camTarget.z+tz*4);else look.copy(camTarget)}
       camera.position.lerp(camDesired,1-Math.exp(-dt*7));camera.lookAt(look);
-      camera.fov=THREE.MathUtils.lerp(camera.fov,CHASE_FOV,dt*5);camera.updateProjectionMatrix();
+      // FOV widens with how hard the player is ACTUALLY sliding right now (drift angle),
+      // not with raw speed - speed-based zoom was explicitly ruled out earlier, but a
+      // slide-specific push is a different trigger and sells the big-angle drift itself
+      // as more dramatic without the view changing just because the car is going fast.
+      const driftMagForFov=player._driftActive?Math.abs(angDelta(player.moveHeading,player.heading)):0;
+      const fovTarget=CHASE_FOV+Math.min(driftMagForFov*6.5,11);
+      camera.fov=THREE.MathUtils.lerp(camera.fov,fovTarget,dt*5);camera.updateProjectionMatrix();
       updateSpeedFx(speedAbs)}
     const fxCanvas=$('speedFx'),fxCtx=fxCanvas.getContext('2d');
     function resizeFx(){fxCanvas.width=innerWidth*Math.min(devicePixelRatio,1.6);fxCanvas.height=innerHeight*Math.min(devicePixelRatio,1.6)}
@@ -874,7 +889,7 @@
       if(mode==='attract'||mode==='controls'){raceTime+=dt;updateAttractDrive(dt);updateAttractCamera(dt)}
       else if(mode==='vehicleSelect'||mode==='trackSelect'){for(let i=1;i<cars.length;i++)driveAI(cars[i],dt);updateShowcase(dt)}
       else if(mode==='countdown'){countdown-=dt;const n=Math.ceil(countdown);$('banner').textContent=n>0?n:'GO!';$('banner').classList.add('show');if(countdown<=0){mode='race';setTimeout(()=>{if(!paused)$('banner').classList.remove('show')},650)}updateCamera(dt);updateHUD()}
-      else{const driftTimeTarget=player._driftActive?.78:1;driftTimeScale=THREE.MathUtils.lerp(driftTimeScale,driftTimeTarget,1-Math.exp(-dt*6));const gdt=dt*driftTimeScale;raceTime+=gdt;updatePlayer(gdt);updateAI(gdt);collisions();updateSmoke(gdt);updateSkids(gdt);updateCamera(gdt);updateHUD()}
+      else{const driftTimeTarget=player._driftActive?.55:1;driftTimeScale=THREE.MathUtils.lerp(driftTimeScale,driftTimeTarget,1-Math.exp(-dt*14));const gdt=dt*driftTimeScale;raceTime+=gdt;updatePlayer(gdt);updateAI(gdt);collisions();updateSmoke(gdt);updateSkids(gdt);updateCamera(gdt);updateHUD()}
       composer.render()}
     tick();
     function resizeRenderer(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false);renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));composer.setSize(innerWidth,innerHeight);bloomPass.setSize(innerWidth,innerHeight)}
