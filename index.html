@@ -537,12 +537,21 @@
       if(player.speed>0)player.speed=Math.max(0,player.speed-rollingDrag*dt);else if(player.speed<0)player.speed=Math.min(0,player.speed+rollingDrag*dt);
       player.speed=THREE.MathUtils.clamp(player.speed,brakeAmt>0&&gasAmt<=0?-8:0,top);
 
-      const speedAbs=Math.abs(player.speed),startDrift=input.drift&&player.speed>9&&Math.abs(player.steer)>.12;
+      // Use steerTarget (the raw, instantaneous input) here, NOT the lerped player.steer -
+      // player.steer lags a few frames behind a fresh key/stick press. If the player had
+      // just been steering one way and flicks to the OTHER way while tapping the
+      // handbrake in that same instant (a completely normal way to start a drift),
+      // player.steer could still read the OLD direction for a frame or two - locking
+      // _driftDir to the wrong side for the ENTIRE drift, since it's only ever set once
+      // at initiation. That's exactly "I turn left and the car goes right" reported
+      // during ordinary play, not a crash or an edge case.
+      const speedAbs=Math.abs(player.speed),startDrift=input.drift&&player.speed>9&&Math.abs(steerTarget)>.12;
       if(!player._driftActive&&startDrift){
-        player._driftActive=true;player._driftDir=Math.sign(player.steer);player._driftCharge=0;
-        // A short yaw-rate impulse breaks rear traction without teleporting the body
-        // through a 50-degree angle as the previous version did.
-        player.yawRate+=player._driftDir*.62;
+        player._driftActive=true;player._driftDir=Math.sign(steerTarget);player._driftCharge=0;
+        // A bigger initial snap (was .62) for a much more violent break-loose the
+        // instant the handbrake bites - the whole slide is meant to read as extreme
+        // from the very first frame, not ease into it.
+        player.yawRate+=player._driftDir*.95;
       }
       const endDrift=player._driftActive&&(!input.drift||player.speed<7);
       if(endDrift){
@@ -571,12 +580,12 @@
       let desiredYaw=player.steer*(.6+1.05*speedFactor)*sm.handlingMult*dirSign;
       if(player._driftActive){
         const same=Math.max(0,player.steer*player._driftDir);
-        // Pushed further still: the natural (non-clamped) slide target this settles
-        // into is now up to ~72 degrees (was ~58), and with countersteer gone there's
-        // no way to shrink it early - it just holds there for as long as the handbrake
-        // stays down.
-        const targetSlip=player._driftDir*(.5+.6*same+.15*speedFactor);
-        const slideYaw=player._driftDir*(.65+1.2*same)*(.55+.45*speedFactor);
+        // Pushed further still per explicit request ("5x more dramatic"): natural
+        // (non-clamped) slide target now up to ~85 degrees (was ~72), and with
+        // countersteer gone there's no way to shrink it early - it just holds there
+        // for as long as the handbrake stays down.
+        const targetSlip=player._driftDir*(.6+.7*same+.18*speedFactor);
+        const slideYaw=player._driftDir*(.8+1.4*same)*(.55+.45*speedFactor);
         desiredYaw=slideYaw+(targetSlip-slipNow)*2.1;
       }
       desiredYaw=THREE.MathUtils.clamp(desiredYaw*rollingFactor,-2.25,2.25);
@@ -584,16 +593,17 @@
       player.yawRate=THREE.MathUtils.lerp(player.yawRate,desiredYaw,1-Math.exp(-dt*yawResponse));
       player.heading+=player.yawRate*dt;
       const slipBeforeGrip=angDelta(player.moveHeading,player.heading);
-      // Grip cut even further (2.35->2.0) so moveHeading lags heading longer - the slide
-      // holds its angle (and keeps carrying the car sideways) for noticeably longer
+      // Grip cut even further (2.0->1.5) so moveHeading lags heading longer still - the
+      // slide holds its angle (and keeps carrying the car sideways) for even longer
       // before it would even reach the soft-catch band below.
-      let grip=player._driftActive?2:(player._recoverTimer>0?5.8:12.5*sm.handlingMult);
+      let grip=player._driftActive?1.5:(player._recoverTimer>0?5.8:12.5*sm.handlingMult);
       // Soft-catch band and hard clamp both scaled up again to match the wider target -
-      // slide cap raised from ~75 to ~83 degrees for an even longer, more extreme angle.
-      if(player._driftActive&&Math.abs(slipBeforeGrip)>1.15)grip+=8*(Math.abs(slipBeforeGrip)-1.15)/.2;
+      // slide cap raised from ~83 to ~89 degrees, as extreme as it gets without the car
+      // starting to travel backwards relative to its own nose.
+      if(player._driftActive&&Math.abs(slipBeforeGrip)>1.35)grip+=8*(Math.abs(slipBeforeGrip)-1.35)/.2;
       player.moveHeading=angDamp(player.moveHeading,player.heading,grip,dt);
       const limitedSlip=angDelta(player.moveHeading,player.heading);
-      if(player._driftActive&&Math.abs(limitedSlip)>1.45){player.heading=player.moveHeading+Math.sign(limitedSlip)*1.45;player.yawRate*=.7}
+      if(player._driftActive&&Math.abs(limitedSlip)>1.55){player.heading=player.moveHeading+Math.sign(limitedSlip)*1.55;player.yawRate*=.7}
       player.position.x+=Math.sin(player.moveHeading)*player.speed*dt;
       player.position.z+=Math.cos(player.moveHeading)*player.speed*dt;
       const info=nearestSample(player.position,player._sampleHint);player._sampleHint=info.index;const halfW=TRACK_W*.86,wallLimit=TRACK_W+2.5,absLat=Math.abs(info.lateral);player.position.y=THREE.MathUtils.lerp(player.position.y,info.y,1-Math.exp(-dt*22));
