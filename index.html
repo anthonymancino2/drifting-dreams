@@ -497,6 +497,11 @@
     canvas.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;orbitYaw-=dx*.008;orbitPitch=THREE.MathUtils.clamp(orbitPitch+dy*.005,-.12,.75);camMode=2;lastX=e.clientX;lastY=e.clientY;$('camLabel').textContent='CAM: 360° ORBIT · DRAG TO LOOK'});canvas.addEventListener('pointerup',()=>dragging=false);canvas.addEventListener('pointercancel',()=>dragging=false);
 
     let mode='attract',raceTime=0,countdown=3.7,nitro=1,driftScore=0,totalScore=0,lastPuff=0;
+    // A committed drift gets a light "bullet time" dip - the whole world (AI included)
+    // slows down a little while the player is actually sliding, for a more dramatic,
+    // cinematic feel. Smoothly lerped rather than snapped, so it eases in/out instead of
+    // jarring the moment the handbrake is pressed or released.
+    let driftTimeScale=1;
     cars.forEach(c=>placeCar(c));
     function updatePlayer(dt){
       // Positive steer must curve the car toward the camera-relative right. Verified via
@@ -739,7 +744,7 @@
       if(player._miniBoostTimer>0)driftState.textContent='MINI-TURBO '+['','I','II','III'][player._driftTier||1];else if(player._driftActive){const tier=player._driftCharge>=2.15?'◆◆◆':player._driftCharge>=1.2?'◆◆':player._driftCharge>=.55?'◆':'◇';driftState.textContent='SLIDE '+slipDeg+'° '+tier}else driftState.textContent=input.drift?'STEER TO INITIATE':'HOLD DRIFT + STEER';
       $('debugReadout').textContent='L:'+(input.left?1:0)+' R:'+(input.right?1:0)+' steer:'+player.steer.toFixed(2)+' heading:'+(player.heading*180/Math.PI%360).toFixed(0)+'° cam:'+camMode+' yaw:'+(orbitYaw*180/Math.PI).toFixed(0)+'°';
     }
-    function resetRace(){raceTime=0;countdown=3.7;nitro=1;driftScore=totalScore=0;camMode=0;orbitYaw=0;orbitPitch=.22;dragging=false;$('camLabel').textContent='CAM: CHASE · DRAG TO ORBIT';$('drift').classList.remove('active','boost');$('driftState').textContent='HOLD DRIFT + STEER';cars.forEach((c,i)=>{const st=spawnTransform(i);c.position.copy(st.position);c.heading=st.heading;c.moveHeading=st.heading;c.speed=0;c.steer=0;c.yawRate=0;c._driftActive=false;c._driftDir=0;c._driftCharge=0;c._recoverTimer=0;c._miniBoostTimer=0;c._miniBoostStrength=0;c._driftTier=0;c._skidAccum=0;c._lastIdx=null;c._sampleHint=null;c.lapDist=0;c.progress=0;c.lap=1;placeCar(c)});mode='countdown';$('hud').classList.add('on');$('touch').classList.add('show');showScreen(null)}
+    function resetRace(){raceTime=0;countdown=3.7;nitro=1;driftScore=totalScore=0;driftTimeScale=1;camMode=0;orbitYaw=0;orbitPitch=.22;dragging=false;$('camLabel').textContent='CAM: CHASE · DRAG TO ORBIT';$('drift').classList.remove('active','boost');$('driftState').textContent='HOLD DRIFT + STEER';cars.forEach((c,i)=>{const st=spawnTransform(i);c.position.copy(st.position);c.heading=st.heading;c.moveHeading=st.heading;c.speed=0;c.steer=0;c.yawRate=0;c._driftActive=false;c._driftDir=0;c._driftCharge=0;c._recoverTimer=0;c._miniBoostTimer=0;c._miniBoostStrength=0;c._driftTier=0;c._skidAccum=0;c._lastIdx=null;c._sampleHint=null;c.lapDist=0;c.progress=0;c.lap=1;placeCar(c)});mode='countdown';$('hud').classList.add('on');$('touch').classList.add('show');showScreen(null)}
 
     // --- Screen flow: attract (title + cinematic demo loop) -> vehicle select ->
     // track select -> countdown -> race. Every screen is a plain <section class="screen">
@@ -869,7 +874,7 @@
       if(mode==='attract'||mode==='controls'){raceTime+=dt;updateAttractDrive(dt);updateAttractCamera(dt)}
       else if(mode==='vehicleSelect'||mode==='trackSelect'){for(let i=1;i<cars.length;i++)driveAI(cars[i],dt);updateShowcase(dt)}
       else if(mode==='countdown'){countdown-=dt;const n=Math.ceil(countdown);$('banner').textContent=n>0?n:'GO!';$('banner').classList.add('show');if(countdown<=0){mode='race';setTimeout(()=>{if(!paused)$('banner').classList.remove('show')},650)}updateCamera(dt);updateHUD()}
-      else{raceTime+=dt;updatePlayer(dt);updateAI(dt);collisions();updateSmoke(dt);updateSkids(dt);updateCamera(dt);updateHUD()}
+      else{const driftTimeTarget=player._driftActive?.78:1;driftTimeScale=THREE.MathUtils.lerp(driftTimeScale,driftTimeTarget,1-Math.exp(-dt*6));const gdt=dt*driftTimeScale;raceTime+=gdt;updatePlayer(gdt);updateAI(gdt);collisions();updateSmoke(gdt);updateSkids(gdt);updateCamera(gdt);updateHUD()}
       composer.render()}
     tick();
     function resizeRenderer(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false);renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));composer.setSize(innerWidth,innerHeight);bloomPass.setSize(innerWidth,innerHeight)}
