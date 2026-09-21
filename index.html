@@ -637,7 +637,18 @@
       player.position.z+=Math.cos(player.moveHeading)*player.speed*dt;
       const info=nearestSample(player.position,player._sampleHint);player._sampleHint=info.index;const halfW=TRACK_W*.86,wallLimit=TRACK_W+2.5,absLat=Math.abs(info.lateral);player.position.y=THREE.MathUtils.lerp(player.position.y,info.y,1-Math.exp(-dt*22));
       if(absLat>halfW){const excess=Math.min(absLat,wallLimit)-halfW;player.speed-=(2+excess*.8)*dt}
-      if(absLat>wallLimit){const dir=Math.sign(info.lateral),s=SAMPLES[info.index];player.position.x=s.p.x+info.side.x*wallLimit*dir;player.position.z=s.p.z+info.side.z*wallLimit*dir;
+      if(absLat>wallLimit){const dir=Math.sign(info.lateral),s=SAMPLES[info.index];
+        // Clamp ONLY the lateral (sideways) component back to the wall, preserving how
+        // far the car actually got along the track this frame - resetting straight to
+        // `s.p` (the sample's own centerline point) throws that away instead. If the
+        // nearest-sample index hadn't ticked over yet this frame (very likely while
+        // still tangled up with the wall), that reset put the car back at nearly the
+        // exact same spot every single frame - a soft-lock that looked like the game
+        // freezing/glitching, while held throttle kept building speed the whole time
+        // with nowhere to go. The moment moveHeading finally drifted enough to escape,
+        // all that pent-up speed let go at once - the reported "slingshot" off a wall.
+        const dx=player.position.x-s.p.x,dz=player.position.z-s.p.z,along=dx*info.tangent.x+dz*info.tangent.z;
+        player.position.x=s.p.x+info.tangent.x*along+info.side.x*wallLimit*dir;player.position.z=s.p.z+info.tangent.z*along+info.side.z*wallLimit*dir;
         // Only nudge moveHeading (actual travel direction) toward the track, as a guide
         // rail so holding forward alone naturally redirects the car back onto the road -
         // NEVER touch player.heading, which is the player's own steering input. This used
@@ -677,7 +688,7 @@
       const target=c.base*(1-cornerCut)*driftBonus+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.8*(aiCornering?1.4:.85)*speedFactor*dt;
       // Grip cut hard here too (was 4.2, matching the player's .55->.28 cut) so the AI's
       // slide holds for longer and reads as just as extreme as the player's.
-      c.moveHeading=angDamp(c.moveHeading,c.heading,aiCornering?2.1:13,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];c.position.x=s.p.x+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.side.z*wallLimit*dir;c.speed*=.85}
+      c.moveHeading=angDamp(c.moveHeading,c.heading,aiCornering?2.1:13,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];const dx2=c.position.x-s.p.x,dz2=c.position.z-s.p.z,along2=dx2*info2.tangent.x+dz2*info2.tangent.z;c.position.x=s.p.x+info2.tangent.x*along2+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.tangent.z*along2+info2.side.z*wallLimit*dir;c.speed*=.85}
       // Same fix as the player's threshold below - only show smoke/skid marks for a
       // slide big enough to actually read as one, not every minor angle its normal
       // (non-cornering) grip can produce on its own.
