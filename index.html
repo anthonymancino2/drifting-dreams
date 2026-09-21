@@ -133,12 +133,24 @@
     // Redesigned again once real-world top speeds landed (a 165-220mph car needs actual
     // ROOM) - the old layout had two corners down at a 14-15m radius, which is a
     // near-hairpin: at realistic speed the only way through one of those is braking to a
-    // near-stop first, not drifting. Measured every corner's actual radius (circumradius
-    // from sampled triplets along the curve) while redesigning this, aiming for a
-    // flowing sequence of medium sweepers a slide can actually be held through - minimum
-    // radius is now ~43m (was 14m), with a dozen distinct corners spread 43-150m across
-    // the lap instead of a couple of tight hairpins between long straight-line stretches.
-    const points=[[-230,6,-100],[-230,7,20],[-200,8,130],[-120,9,190],[-10,9,200],[90,8,175],[150,8,120],[170,7,40],[150,6,-40],[190,6,-110],[230,5,-200],[210,4,-290],[130,4,-330],[20,5,-320],[-70,6,-280],[-140,6,-220],[-190,6,-160],[-210,6,-130]].map(p=>new THREE.Vector3(...p));
+    // near-stop first, not drifting. Measured every corner's actual radius while
+    // redesigning this, aiming for a flowing sequence of medium sweepers a slide can
+    // actually be held through - minimum radius ~43m, TRACK_W widened to 26.
+    // Redesigned YET again for "touge the whole time" - the corner-cluster layout above
+    // still measured over half the lap (52.8%) as essentially straight-line driving,
+    // with real cornering only 9.3% of the track. Generated this one procedurally as a
+    // sine-wave lateral perturbation around a base oval (not hand-placed corner
+    // clusters), specifically because that gives smooth, CONTINUOUS curvature the whole
+    // way around rather than corners-then-straights - a real mountain pass road never
+    // fully straightens out. Iterated wave count/amplitude/point density against the
+    // same radius-measurement approach until the whole lap held a minimum ~37m radius
+    // (zero segments under 35m, avoiding the near-hairpin problem from before) with
+    // cornering now 47% of the lap and straight sections down to 24.4% (from 52.8%).
+    // This is denser (56 points, every ~29m) than the earlier hand-placed corners, which
+    // is exactly what worried the AI-pathing regression from the very first redesign
+    // attempt (a procedural approach that broke AI pathing with sharp cusps) - re-tested
+    // against that same benchmark (laps completed in 90s) before shipping this.
+    const points=[[240,12,0],[219,13.1,21],[201.7,13.6,38.3],[192.4,13.4,55.7],[190.9,12.5,77.2],[193.3,11,104.6],[193.7,8.9,136.5],[186.9,6.5,168.2],[170.3,4,193.8],[144.5,2,208.4],[113.1,2,210.5],[80.5,2,202.2],[50.3,2,189],[23.8,2,177.5],[0,2,173],[-23.8,2,177.5],[-50.3,2,189],[-80.5,4.2,202.2],[-113.1,7.1,210.5],[-144.5,9.9,208.4],[-170.3,12.4,193.8],[-186.9,14.4,168.2],[-193.7,15.6,136.5],[-193.3,15.9,104.6],[-190.9,15.3,77.2],[-192.4,13.9,55.7],[-201.7,11.7,38.3],[-219,9,21],[-240,6,0],[-258,3,-26],[-266.2,2,-55.1],[-260.7,2,-83],[-241.6,2,-105.1],[-213.1,2,-118.9],[-181.6,2,-125.4],[-152.5,2,-128.8],[-129,2,-134.6],[-110.9,2.1,-147.2],[-95.2,4.9,-167.9],[-78.1,7.8,-194.3],[-56.5,10.5,-220.5],[-29.9,12.7,-239.9],[0,14.2,-247],[29.9,15,-239.9],[56.5,15,-220.5],[78.1,14.1,-194.3],[95.2,12.6,-167.9],[110.9,10.4,-147.2],[129,8,-134.6],[152.5,5.5,-128.8],[181.6,3.1,-125.4],[213.1,2,-118.9],[241.6,2,-105.1],[260.7,2,-83],[266.2,2,-55.1],[258,2,-26]].map(p=>new THREE.Vector3(...p));
     const curve=new THREE.CatmullRomCurve3(points,true,'centripetal',.45), TRACK_W=26, trackLength=curve.getLength();
     const up=new THREE.Vector3(0,1,0), vA=new THREE.Vector3(),vB=new THREE.Vector3(),vC=new THREE.Vector3();
     function frame(u){const p=curve.getPointAt((u%1+1)%1),t=curve.getTangentAt((u%1+1)%1).normalize(),side=new THREE.Vector3().crossVectors(t,up).normalize();return{p,t,side}}
