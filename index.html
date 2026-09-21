@@ -317,14 +317,45 @@
     // sports-car pack (hypercar/supercar/muscle/rally/police/offroad silhouettes) that
     // had been extracted once before but never made it into the live build - added back
     // in per request, both as playable choices and as the AI's racing roster.
-    // Real-world top speed (mph) per assetIndex, by vehicle class - a hypercar tops out
-    // near 220mph, a cargo van near 95mph, instead of every car in the game sharing the
-    // same flat, unrealistic number. player.speed is already true meters/second
-    // (updateHUD's mph readout is an exact m/s->mph conversion), so this converts
-    // directly into real speed caps. Shared with the VEHICLES stat list further down, so
-    // there's one source of truth for each car's actual top speed.
-    const VEHICLE_TOP_MPH=[165,180,150,120,130,115,130,220,205,210,195,160,170,135,110,105,150,115,95]; // by assetIndex: [ApexGT,VelocityS2,Interceptor,CityCab,Trailblazer,Commuter,SedanLX,fenyr,italia,lamb,ghini,coupe,kamaro,rally,armor,jeep,police,mobil,van]
+    // Moved up here (was much later, right before the vehicle-select stats UI) so
+    // makeCar - which runs early, building the whole 32-car field - can use real
+    // per-car stats too, not just top speed. Previously AI cars only ever differed by
+    // top speed; accel/handling stats existed for the player's own car but had no
+    // parallel data source available this early, so AI never reflected them at all.
+    // player.speed is already true meters/second (updateHUD's mph readout is an exact
+    // m/s->mph conversion), so topMph converts directly into a real speed cap.
     const mphToMs=mph=>mph/2.23694;
+    const VEHICLES=[
+      {assetIndex:0,name:'Apex GT',tag:'Balanced sports coupe',speed:4,accel:4,handling:3,topMph:165},
+      {assetIndex:1,name:'Velocity S2',tag:'Lightweight sports car',speed:5,accel:5,handling:2,topMph:180},
+      {assetIndex:2,name:'Interceptor',tag:'Police-tuned pursuit',speed:4,accel:3,handling:4,topMph:150},
+      {assetIndex:3,name:'City Cab',tag:'Taxi',speed:2,accel:2,handling:5,topMph:120},
+      {assetIndex:4,name:'Trailblazer',tag:'SUV',speed:2,accel:2,handling:3,topMph:130},
+      {assetIndex:5,name:'Commuter',tag:'Compact',speed:3,accel:3,handling:4,topMph:115},
+      {assetIndex:6,name:'Sedan LX',tag:'Sedan',speed:3,accel:3,handling:3,topMph:130},
+      // A second, more varied sports-car pack - hypercar/supercar/muscle/rally/police/
+      // offroad silhouettes - restored after being found still sitting unused in an
+      // earlier bundled build. These 7 (all but Street Coupe/Armor Unit/Trail Runner/
+      // City Runner/Cargo Van) are also the AI's racing roster - see AI_ROSTER.
+      {assetIndex:7,name:'Nemesis GT',tag:'Hypercar',speed:5,accel:5,handling:2,topMph:220},
+      {assetIndex:8,name:'Scarlet GT',tag:'Supercar',speed:5,accel:4,handling:3,topMph:205},
+      {assetIndex:9,name:'Super V12',tag:'Supercar',speed:5,accel:5,handling:2,topMph:210},
+      {assetIndex:10,name:'Onyx Supercar',tag:'Supercar',speed:4,accel:4,handling:3,topMph:195},
+      {assetIndex:11,name:'Street Coupe',tag:'Sports coupe',speed:3,accel:3,handling:4,topMph:160},
+      {assetIndex:12,name:'Muscle 6.2',tag:'Muscle car',speed:4,accel:5,handling:2,topMph:170},
+      {assetIndex:13,name:'Rally Cross',tag:'Rally car',speed:4,accel:4,handling:5,topMph:135},
+      {assetIndex:14,name:'Armor Unit',tag:'Armored SUV',speed:2,accel:2,handling:4,topMph:110},
+      {assetIndex:15,name:'Trail Runner',tag:'Off-roader',speed:2,accel:2,handling:3,topMph:105},
+      {assetIndex:16,name:'Police Cruiser',tag:'Police-tuned pursuit',speed:4,accel:3,handling:4,topMph:150},
+      {assetIndex:17,name:'City Runner',tag:'Compact',speed:3,accel:3,handling:3,topMph:115},
+      {assetIndex:18,name:'Cargo Van',tag:'Van',speed:2,accel:2,handling:3,topMph:95}
+    ];
+    // Widened significantly (was .8-1.2 accel, .85-1.15 handling - only a ~35-50% spread
+    // top to bottom, too subtle to actually feel from the driver's seat) so picking a
+    // low-stat car for its real top speed still costs you something real in how it
+    // accelerates and turns, not just a small number nobody notices. Used by both the
+    // player (via setPlayerVehicle) and every AI car (via makeCar) now.
+    function statMultipliers(v){return{topMs:mphToMs(v.topMph),accelMult:.6+(v.accel-1)*.175,handlingMult:.6+(v.handling-1)*.1625}}
     // A car's TOP speed and its actual average pace on a technical, corner-heavy circuit
     // are very different things in real racing - nobody sustains 220mph on a track this
     // tight. AI cruises at this fraction of its true top speed by default (still scaled
@@ -409,7 +440,11 @@
     function makeCar(i){const root=new THREE.Group();scene.add(root);const rosterEntry=i===0?{assetIndex:0,racer:true}:AI_ROSTER[(i-1)%AI_ROSTER.length],assetIndex=rosterEntry.assetIndex,racer=rosterEntry.racer;
       const visual=buildCarVisual(root,assetIndex,rosterEntry.tint?colors[i%colors.length]:null);
       if(racer&&i>0){const marker=new THREE.Sprite(markerMat);marker.scale.set(1.3,1.3,1.3);marker.position.set(0,visual.box.max.y+1.3,0);root.add(marker)}
-      const st=spawnTransform(i);const c={root,model:visual.model,wheels:visual.wheels,groundLift:visual.groundLift,sirenLights:visual.sirenLights,racer,assetIndex,position:st.position,heading:st.heading,moveHeading:st.heading,speed:0,steer:0,_lastIdx:null,lapDist:0,progress:0,lap:1,ai:i>0,base:mphToMs(VEHICLE_TOP_MPH[assetIndex])*AI_CRUISE_FACTOR+(i%3)*1.5,laneOffset:((i%3)-1)*4.5,seed:i*7.31};cars.push(c);return c}
+      // Every AI car now carries the same real per-vehicle stats the player's own car
+      // uses (statMods), not just a top-speed number - see driveAI for where
+      // accelMult/handlingMult actually change how it accelerates and corners.
+      const spec=VEHICLES.find(v=>v.assetIndex===assetIndex),statMods=statMultipliers(spec);
+      const st=spawnTransform(i);const c={root,model:visual.model,wheels:visual.wheels,groundLift:visual.groundLift,sirenLights:visual.sirenLights,racer,assetIndex,statMods,position:st.position,heading:st.heading,moveHeading:st.heading,speed:0,steer:0,_lastIdx:null,lapDist:0,progress:0,lap:1,ai:i>0,base:statMods.topMs*AI_CRUISE_FACTOR+(i%3)*1.5,laneOffset:((i%3)-1)*4.5,seed:i*7.31};cars.push(c);return c}
     // Re-skins the player's car in place (position/physics untouched) - used by the
     // vehicle-select screen so cycling through cars updates the live 3D preview.
     function setPlayerVehicle(assetIndex){const visual=buildCarVisual(player.root,assetIndex,null);player.model=visual.model;player.wheels=visual.wheels;player.groundLift=visual.groundLift;player.sirenLights=visual.sirenLights;player.assetIndex=assetIndex;player.rollVisual=0;
@@ -762,10 +797,17 @@
       // bonus instead of the old flat cut - normal driving/turning should read as
       // visibly slower than a bot that's actually sliding through the corner.
       const cornerCut=aiCornering?0:Math.abs(c.steer)*.5,driftBonus=aiCornering?1.25:1;
-      const target=c.base*(1-cornerCut)*driftBonus+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.8*(aiCornering?1.4:.85)*speedFactor*dt;
+      // accelMult/handlingMult now actually differentiate AI cars, not just their top
+      // speed - a low-accel car (van, taxi) visibly takes longer to reach its target
+      // speed out of a corner, and a low-handling car (hypercar, muscle car) turns
+      // noticeably duller when NOT committed to a drift. The cornering/drift multipliers
+      // (1.4, 2.1) stay uniform across every car on purpose, same principle as the
+      // player's handbrake: every car is equally good at the signature drift mechanic,
+      // stats only affect how it drives the rest of the time.
+      const target=c.base*(1-cornerCut)*driftBonus+Math.sin(raceTime*.2+c.seed)*2.5;c.speed=THREE.MathUtils.lerp(c.speed,target,dt*.55*c.statMods.accelMult);const speedFactor=THREE.MathUtils.clamp(Math.abs(c.speed)/8,0,1);c.heading+=c.steer*2.8*(aiCornering?1.4:.85*c.statMods.handlingMult)*speedFactor*dt;
       // Grip cut hard here too (was 4.2, matching the player's .55->.28 cut) so the AI's
       // slide holds for longer and reads as just as extreme as the player's.
-      c.moveHeading=angDamp(c.moveHeading,c.heading,aiCornering?2.1:13,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];const dx2=c.position.x-s.p.x,dz2=c.position.z-s.p.z,along2=dx2*info2.tangent.x+dz2*info2.tangent.z;c.position.x=s.p.x+info2.tangent.x*along2+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.tangent.z*along2+info2.side.z*wallLimit*dir;c.speed*=.85}
+      c.moveHeading=angDamp(c.moveHeading,c.heading,aiCornering?2.1:13*c.statMods.handlingMult,dt);c.position.x+=Math.sin(c.moveHeading)*c.speed*dt;c.position.z+=Math.cos(c.moveHeading)*c.speed*dt;const wallLimit=TRACK_W+2.5,info2=nearestSample(c.position,c._sampleHint);c._sampleHint=info2.index;const absLat2=Math.abs(info2.lateral);if(absLat2>wallLimit){const dir=Math.sign(info2.lateral),s=SAMPLES[info2.index];const dx2=c.position.x-s.p.x,dz2=c.position.z-s.p.z,along2=dx2*info2.tangent.x+dz2*info2.tangent.z;c.position.x=s.p.x+info2.tangent.x*along2+info2.side.x*wallLimit*dir;c.position.z=s.p.z+info2.tangent.z*along2+info2.side.z*wallLimit*dir;c.speed*=.85}
       // Same fix as the player's threshold below - only show smoke/skid marks for a
       // slide big enough to actually read as one, not every minor angle its normal
       // (non-cornering) grip can produce on its own.
@@ -868,39 +910,11 @@
     // track select -> countdown -> race. Every screen is a plain <section class="screen">
     // toggled via showScreen(); only one is ever visible (or none, during the race itself).
     function showScreen(id){document.querySelectorAll('.screen').forEach(el=>el.classList.add('hidden'));if(id)$(id).classList.remove('hidden')}
-    // Speed/Accel scale the player's top speed and throttle response; Handling only
-    // scales NORMAL (non-handbrake) grip - every car keeps the exact same handbrake
-    // drift (that's the point of the game), a low-handling car is just looser and more
-    // twitchy the rest of the time. Stats are 1-5, shown as filled bars in the picker.
-    // topMph here matches VEHICLE_TOP_MPH above (defined early so makeCar can use it
-    // before this point in the file) - kept spelled out per-entry alongside name/tag/
-    // stats since this is the human-readable stats table shown in the picker.
-    const VEHICLES=[
-      {assetIndex:0,name:'Apex GT',tag:'Balanced sports coupe',speed:4,accel:4,handling:3,topMph:165},
-      {assetIndex:1,name:'Velocity S2',tag:'Lightweight sports car',speed:5,accel:5,handling:2,topMph:180},
-      {assetIndex:2,name:'Interceptor',tag:'Police-tuned pursuit',speed:4,accel:3,handling:4,topMph:150},
-      {assetIndex:3,name:'City Cab',tag:'Taxi',speed:2,accel:2,handling:5,topMph:120},
-      {assetIndex:4,name:'Trailblazer',tag:'SUV',speed:2,accel:2,handling:3,topMph:130},
-      {assetIndex:5,name:'Commuter',tag:'Compact',speed:3,accel:3,handling:4,topMph:115},
-      {assetIndex:6,name:'Sedan LX',tag:'Sedan',speed:3,accel:3,handling:3,topMph:130},
-      // A second, more varied sports-car pack - hypercar/supercar/muscle/rally/police/
-      // offroad silhouettes - restored after being found still sitting unused in an
-      // earlier bundled build. These 7 (all but Street Coupe/Armor Unit/Trail Runner/
-      // City Runner/Cargo Van) are also the AI's racing roster - see AI_ROSTER.
-      {assetIndex:7,name:'Nemesis GT',tag:'Hypercar',speed:5,accel:5,handling:2,topMph:220},
-      {assetIndex:8,name:'Scarlet GT',tag:'Supercar',speed:5,accel:4,handling:3,topMph:205},
-      {assetIndex:9,name:'Super V12',tag:'Supercar',speed:5,accel:5,handling:2,topMph:210},
-      {assetIndex:10,name:'Onyx Supercar',tag:'Supercar',speed:4,accel:4,handling:3,topMph:195},
-      {assetIndex:11,name:'Street Coupe',tag:'Sports coupe',speed:3,accel:3,handling:4,topMph:160},
-      {assetIndex:12,name:'Muscle 6.2',tag:'Muscle car',speed:4,accel:5,handling:2,topMph:170},
-      {assetIndex:13,name:'Rally Cross',tag:'Rally car',speed:4,accel:4,handling:5,topMph:135},
-      {assetIndex:14,name:'Armor Unit',tag:'Armored SUV',speed:2,accel:2,handling:4,topMph:110},
-      {assetIndex:15,name:'Trail Runner',tag:'Off-roader',speed:2,accel:2,handling:3,topMph:105},
-      {assetIndex:16,name:'Police Cruiser',tag:'Police-tuned pursuit',speed:4,accel:3,handling:4,topMph:150},
-      {assetIndex:17,name:'City Runner',tag:'Compact',speed:3,accel:3,handling:3,topMph:115},
-      {assetIndex:18,name:'Cargo Van',tag:'Van',speed:2,accel:2,handling:3,topMph:95}
-    ];
-    function statMultipliers(v){return{topMs:mphToMs(v.topMph),accelMult:.8+(v.accel-1)*.1,handlingMult:.85+(v.handling-1)*.075}}
+    // Speed/Accel scale top speed and throttle response; Handling only scales NORMAL
+    // (non-handbrake) grip - every car keeps the exact same handbrake drift (that's the
+    // point of the game), a low-handling car is just looser and more twitchy the rest of
+    // the time. Stats are 1-5, shown as filled bars in the picker. VEHICLES/statMultipliers
+    // now live up near AI_CRUISE_FACTOR (moved so makeCar can use real per-car stats too).
     // A one-time render-to-texture snapshot of each car, cached, so the picker shows
     // what you're actually choosing instead of just a name - a fresh scene/camera keeps
     // this completely independent of wherever the real car currently sits on track (the
@@ -910,15 +924,44 @@
       if(carThumbnails[assetIndex])return carThumbnails[assetIndex];
       const size=256,rt=new THREE.WebGLRenderTarget(size,size);
       const tScene=new THREE.Scene();
+      // Some models (Onyx Supercar, Street Coupe, ...) render almost black in the
+      // picker. Traced this all the way down: their material's own .color is actually
+      // WHITE, but the texture atlas painted onto it is genuinely dark (Onyx is meant to
+      // be a black car - that's the name) - no amount of extra lights, tone-mapping
+      // changes, or metalness/roughness normalization can brighten a dark TEXTURE, since
+      // none of those touch the pixels actually being sampled. This is exactly the
+      // problem real product photography solves for dark cars: not more light on the
+      // paint, but a lighter background plus a rim light so the shape stays legible
+      // against a genuinely dark subject instead of trying to force the paint to look
+      // like something it isn't.
       tScene.add(new THREE.HemisphereLight(0x9db8ff,0x201040,2.4));
       const dir=new THREE.DirectionalLight(0xffffff,2.6);dir.position.set(3,5,4);tScene.add(dir);
+      const rim=new THREE.DirectionalLight(0xcfe8ff,3.2);rim.position.set(-3,2.5,-4.5);tScene.add(rim);
       const model=cloneTint(carAssets[assetIndex],null);model.scale.setScalar(CAR_SCALE);
+      // Still worth normalizing metalness/roughness directly on the clone (not gated
+      // behind a tint color or a material-name match like cloneTint's own PAINT regex,
+      // which is tied to the original pack's naming and misses the second pack
+      // entirely) - harmless for a normally-lit car, and keeps a glossy/metallic
+      // material from going needlessly dark on top of the texture's own tone.
+      model.traverse(x=>{if(!x.isMesh)return;for(const m of Array.isArray(x.material)?x.material:[x.material]){if('metalness' in m)m.metalness=Math.min(m.metalness,.35);if('roughness' in m)m.roughness=Math.max(m.roughness,.35)}});
       const box=new THREE.Box3().setFromObject(model),center=box.getCenter(new THREE.Vector3());
       model.position.sub(center);tScene.add(model);
       const dims=box.getSize(new THREE.Vector3()),maxDim=Math.max(dims.x,dims.y,dims.z,.1);
       const tCam=new THREE.PerspectiveCamera(32,1,.05,50);tCam.position.set(maxDim*1.15,maxDim*.85,maxDim*1.5);tCam.lookAt(0,0,0);
       const prevTarget=renderer.getRenderTarget(),prevClear=new THREE.Color();renderer.getClearColor(prevClear);const prevAlpha=renderer.getClearAlpha();
-      renderer.setRenderTarget(rt);renderer.setClearColor(0x0a1826,1);renderer.clear();renderer.render(tScene,tCam);
+      // The lighting boost above still wasn't enough on its own - the main renderer's
+      // ACESFilmicToneMapping (tuned for the cinematic 3D world, not a UI picker) applies
+      // to this render pass too, and compresses/crushes anything but a bright scene even
+      // further. Switched to flat NoToneMapping with a pushed exposure just for this
+      // snapshot, restored right after, so a picker thumbnail always reads as a clear,
+      // bright, true-color preview regardless of how a given car's paint or the main
+      // scene's cinematic grade would normally render it.
+      const prevToneMapping=renderer.toneMapping,prevExposure=renderer.toneMappingExposure;
+      renderer.toneMapping=THREE.NoToneMapping;renderer.toneMappingExposure=1;
+      // Lightened from near-black (0x0a1826) - a genuinely dark-painted car had almost no
+      // contrast against a near-black backdrop, on top of the texture-darkness issue above.
+      renderer.setRenderTarget(rt);renderer.setClearColor(0x33415e,1);renderer.clear();renderer.render(tScene,tCam);
+      renderer.toneMapping=prevToneMapping;renderer.toneMappingExposure=prevExposure;
       const buffer=new Uint8Array(size*size*4);renderer.readRenderTargetPixels(rt,0,0,size,size,buffer);
       renderer.setRenderTarget(prevTarget);renderer.setClearColor(prevClear,prevAlpha);rt.dispose();
       const canvas=document.createElement('canvas');canvas.width=size;canvas.height=size;const cctx=canvas.getContext('2d');
