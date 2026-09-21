@@ -499,9 +499,12 @@
     let mode='attract',raceTime=0,countdown=3.7,nitro=1,driftScore=0,totalScore=0,lastPuff=0;
     cars.forEach(c=>placeCar(c));
     function updatePlayer(dt){
-      // Positive steering is world-space right. Keeping keyboard, touch and gamepad on
-      // the same sign convention fixes the old reversed-steering behavior.
-      const steerTarget=input.steerAxis!=null?input.steerAxis:(input.right?1:0)-(input.left?1:0);
+      // Positive steer must curve the car toward the camera-relative right. Verified via
+      // the same cross(forward,up) convention this file already uses for the track's own
+      // side vector: with heading=0 (forward=+Z), that convention puts world "right" at
+      // -X, but positive steer was increasing heading, which curves forward toward +X -
+      // the LEFT side. Negated here so holding right actually turns the car right.
+      const steerTarget=-(input.steerAxis!=null?input.steerAxis:(input.right?1:0)-(input.left?1:0));
       const gasAmt=input.throttleAxis!=null&&input.throttleAxis>.02?input.throttleAxis:(input.gas?1:0);
       const brakeAmt=input.brakeAxis!=null&&input.brakeAxis>.02?input.brakeAxis:(input.brake?1:0);
       const sm=player.statMods||{topMs:mphToMs(150),accelMult:1,handlingMult:1};
