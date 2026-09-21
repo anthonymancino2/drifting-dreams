@@ -105,7 +105,10 @@
     const $=id=>document.getElementById(id), canvas=$('game');
     const scene=new THREE.Scene();
     function makeSkyTexture(){const c=document.createElement('canvas');c.width=2;c.height=256;const ctx=c.getContext('2d');const g=ctx.createLinearGradient(0,0,0,256);g.addColorStop(0,'#160c33');g.addColorStop(.42,'#3d1f72');g.addColorStop(.72,'#b23aa0');g.addColorStop(.88,'#ff6f5e');g.addColorStop(1,'#ffb15e');ctx.fillStyle=g;ctx.fillRect(0,0,2,256);const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;return tex}
-    scene.background=makeSkyTexture(); scene.fog=new THREE.FogExp2(0x4a2f7a,.00095);
+    // Density cut roughly 5x along with the track's own 5x scale-up - same absolute
+    // density would have buried the now much farther-away track and skyline in haze
+    // well before they were visible, since fog falloff is a function of raw distance.
+    scene.background=makeSkyTexture(); scene.fog=new THREE.FogExp2(0x4a2f7a,.00019);
     const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
     // The third `false` tells Three not to also pin the canvas's CSS width/height via an
     // inline style - the stylesheet's width:100%;height:100% (canvas#game above) already
@@ -116,7 +119,9 @@
     // landed before the real viewport settled, the canvas gets stuck at the wrong
     // (smaller) size forever, showing the plain dark page background behind the rest.
     renderer.setPixelRatio(Math.min(devicePixelRatio,1.8)); renderer.setSize(innerWidth,innerHeight,false); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.15;
-    const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.08,1800); const clock=new THREE.Clock();
+    // Far plane pushed out (was 1800) so the skyline ring, now sitting out past 2150
+    // units to surround the 5x-bigger track, doesn't get clipped from view.
+    const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.08,3200); const clock=new THREE.Clock();
     const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));const bloomPass=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.5,.4,.92);composer.addPass(bloomPass);composer.addPass(new OutputPass());composer.setSize(innerWidth,innerHeight);
     scene.add(new THREE.HemisphereLight(0x9db8ff,0x4a2f6a,3.6));
     scene.add(new THREE.AmbientLight(0x7a5cff,1.0));
@@ -144,22 +149,43 @@
     // sine-wave lateral perturbation around a base oval (not hand-placed corner
     // clusters), specifically because that gives smooth, CONTINUOUS curvature the whole
     // way around rather than corners-then-straights - a real mountain pass road never
-    // fully straightens out. Iterated wave count/amplitude/point density against the
-    // same radius-measurement approach until the whole lap held a minimum ~37m radius
-    // (zero segments under 35m, avoiding the near-hairpin problem from before) with
-    // cornering now 47% of the lap and straight sections down to 24.4% (from 52.8%).
-    // This is denser (56 points, every ~29m) than the earlier hand-placed corners, which
-    // is exactly what worried the AI-pathing regression from the very first redesign
-    // attempt (a procedural approach that broke AI pathing with sharp cusps) - re-tested
-    // against that same benchmark (laps completed in 90s) before shipping this.
-    const points=[[240,12,0],[219,13.1,21],[201.7,13.6,38.3],[192.4,13.4,55.7],[190.9,12.5,77.2],[193.3,11,104.6],[193.7,8.9,136.5],[186.9,6.5,168.2],[170.3,4,193.8],[144.5,2,208.4],[113.1,2,210.5],[80.5,2,202.2],[50.3,2,189],[23.8,2,177.5],[0,2,173],[-23.8,2,177.5],[-50.3,2,189],[-80.5,4.2,202.2],[-113.1,7.1,210.5],[-144.5,9.9,208.4],[-170.3,12.4,193.8],[-186.9,14.4,168.2],[-193.7,15.6,136.5],[-193.3,15.9,104.6],[-190.9,15.3,77.2],[-192.4,13.9,55.7],[-201.7,11.7,38.3],[-219,9,21],[-240,6,0],[-258,3,-26],[-266.2,2,-55.1],[-260.7,2,-83],[-241.6,2,-105.1],[-213.1,2,-118.9],[-181.6,2,-125.4],[-152.5,2,-128.8],[-129,2,-134.6],[-110.9,2.1,-147.2],[-95.2,4.9,-167.9],[-78.1,7.8,-194.3],[-56.5,10.5,-220.5],[-29.9,12.7,-239.9],[0,14.2,-247],[29.9,15,-239.9],[56.5,15,-220.5],[78.1,14.1,-194.3],[95.2,12.6,-167.9],[110.9,10.4,-147.2],[129,8,-134.6],[152.5,5.5,-128.8],[181.6,3.1,-125.4],[213.1,2,-118.9],[241.6,2,-105.1],[260.7,2,-83],[266.2,2,-55.1],[258,2,-26]].map(p=>new THREE.Vector3(...p));
+    // fully straightens out.
+    // Scaled up again 5x (length and overall footprint) for more room and more traffic -
+    // naively multiplying every coordinate by 5 would have also multiplied every
+    // corner's RADIUS by 5 (radius scales linearly with a uniform geometric scale),
+    // turning the tight touge corners into wide highway sweepers. Kept as a generator
+    // function instead of a hardcoded point list specifically so this could be
+    // re-tuned - radiusX/radiusZ (the base oval) scaled 5x for the bigger footprint,
+    // but wave count and point density were ALSO scaled 5x (25->28 for margin) to add
+    // MORE corners across the bigger loop rather than diluting the same 56 into a much
+    // wider circle, which is what keeps corner radius close to the original ~37m
+    // instead of stretching out to 5x that. Iterated against the same radius-measurement
+    // approach used for every prior redesign: minimum radius 35.8m (still zero segments
+    // under 35m), cornering 46.1% of the lap, length ~8637m (close to the 5x target).
+    function buildTougePoints(radiusX,radiusZ,waves,amp,numPoints,elevAmp){
+      const pts=[];
+      for(let i=0;i<numPoints;i++){
+        const theta=(i/numPoints)*Math.PI*2;
+        const baseX=Math.cos(theta)*radiusX,baseZ=Math.sin(theta)*radiusZ;
+        const tx=-Math.sin(theta)*radiusX,tz=Math.cos(theta)*radiusZ,tlen=Math.hypot(tx,tz);
+        const nx=-tz/tlen,nz=tx/tlen,wave=Math.sin(theta*waves)*amp;
+        const x=baseX+nx*wave,z=baseZ+nz*wave;
+        const y=Math.max(2,6+Math.sin(theta*3)*elevAmp*.4+Math.cos(theta*waves*.5)*elevAmp*.6);
+        pts.push(new THREE.Vector3(x,y,z));
+      }
+      return pts;
+    }
+    const points=buildTougePoints(1200,1050,28,42,320,10);
     const curve=new THREE.CatmullRomCurve3(points,true,'centripetal',.45), TRACK_W=26, trackLength=curve.getLength();
     const up=new THREE.Vector3(0,1,0), vA=new THREE.Vector3(),vB=new THREE.Vector3(),vC=new THREE.Vector3();
     function frame(u){const p=curve.getPointAt((u%1+1)%1),t=curve.getTangentAt((u%1+1)%1).normalize(),side=new THREE.Vector3().crossVectors(t,up).normalize();return{p,t,side}}
     // Real position/heading physics needs a way to project a car's actual (x,z) onto
     // the track and find points ahead of it - precompute a dense sample table once so
     // that lookup is a cheap nearest-neighbor scan instead of an expensive curve query.
-    const SAMPLE_N=300,SAMPLES=[];{let acc=0,prev=null;for(let i=0;i<=SAMPLE_N;i++){const u=i/SAMPLE_N,fr=frame(u);if(prev)acc+=fr.p.distanceTo(prev);SAMPLES.push({p:fr.p.clone(),t:fr.t.clone(),side:fr.side.clone(),arc:acc});prev=fr.p}}
+    // Scaled up with the track (was 300 samples over ~1635m, ~5.5m/sample) so the road's
+    // sampled resolution - nearest-point projection, wall limits, elevation lookup -
+    // doesn't get 5x coarser just because the track got 5x longer.
+    const SAMPLE_N=1600,SAMPLES=[];{let acc=0,prev=null;for(let i=0;i<=SAMPLE_N;i++){const u=i/SAMPLE_N,fr=frame(u);if(prev)acc+=fr.p.distanceTo(prev);SAMPLES.push({p:fr.p.clone(),t:fr.t.clone(),side:fr.side.clone(),arc:acc});prev=fr.p}}
     const TRACK_LEN=SAMPLES[SAMPLE_N].arc;
     function wrapArc(a){return((a%TRACK_LEN)+TRACK_LEN)%TRACK_LEN}
     function nearestSample(pos,hint){
@@ -211,7 +237,11 @@
     function pointAtArc(arc,lateral=0){const a=wrapArc(arc);const bi=Math.max(0,Math.min(SAMPLE_N-1,Math.floor(a/TRACK_LEN*SAMPLE_N)));const s=SAMPLES[bi];return vC.set(s.p.x+s.side.x*lateral,s.p.y+s.side.y*lateral,s.p.z+s.side.z*lateral)}
     function angDelta(a,b){let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return d}
     function angDamp(cur,target,lambda,dt){return cur+angDelta(cur,target)*(1-Math.exp(-lambda*dt))}
-    function spawnTransform(i){const fr=frame(.006-i*.0052),heading=Math.atan2(fr.t.x,fr.t.z),lateral=((i%3)-1)*4.1;return{position:fr.p.clone().addScaledVector(fr.side,lateral),heading}}
+    // Spacing is a fixed ARC-LENGTH gap (8.5m) converted to a track fraction here, not a
+    // fixed fraction of the track directly - with 32 cars now instead of 12, a fixed
+    // fraction would have scaled the whole grid with track length, spreading 31 AI cars
+    // across well over a kilometer on the 5x-bigger track instead of a sane starting grid.
+    function spawnTransform(i){const arcOffset=trackLength*.006-i*8.5,fr=frame(arcOffset/trackLength),heading=Math.atan2(fr.t.x,fr.t.z),lateral=((i%3)-1)*4.1;return{position:fr.p.clone().addScaledVector(fr.side,lateral),heading}}
     // Lap counting can't just snap to "nearest track point" each frame - a car spinning
     // in place near the start/finish line can have its nearest-sample index flicker
     // across the wrap boundary many times without ever actually driving the lap, which
@@ -266,9 +296,16 @@
     const roadBuildings=new THREE.Group();scene.add(roadBuildings);
     for(let i=0;i<130;i++){const u=i/130+.003*Math.sin(i*13),edge=i%2?1:-1,width=8+(i*7%10),depth=8+(i*11%9),height=14+(i*23%46),halfExtent=Math.sqrt(width*width+depth*depth)/2,pos=placeClearOfRoad(u,edge,15+(i*17%30),halfExtent);if(!pos)continue;const b=makeBuilding(width,height,depth,i);b.position.copy(pos);b.rotation.y=(i*1.91)%6.28;roadBuildings.add(b)}
     const skyline=new THREE.Group();scene.add(skyline);
-    for(let i=0;i<48;i++){const a=i/48*Math.PI*2+(i*.37%1)*.06,radius=430+(i*29%70),width=16+(i*13%22),depth=16+(i*7%18),height=50+(i*41%160),b=makeBuilding(width,height,depth,i+500);b.position.set(Math.cos(a)*radius,0,Math.sin(a)*radius);b.rotation.y=i;skyline.add(b)}
+    // Radius scaled up the same 5x the track's own footprint just was (radiusX/radiusZ
+    // 240->1200) - this ring sits at a fixed distance from the world origin regardless
+    // of the track's shape, so when the track got 5x bigger this needed to grow with it
+    // or the "distant skyline" would end up overlapping the road instead of surrounding it.
+    for(let i=0;i<48;i++){const a=i/48*Math.PI*2+(i*.37%1)*.06,radius=2150+(i*29%70)*5,width=16+(i*13%22),depth=16+(i*7%18),height=50+(i*41%160),b=makeBuilding(width,height,depth,i+500);b.position.set(Math.cos(a)*radius,0,Math.sin(a)*radius);b.rotation.y=i;skyline.add(b)}
 
-    const cars=[], colors=[0xffc400,0xe73635,0x178cff,0x15cc87,0xa754ee,0xff6b1b,0xf1f1f1,0x222a38,0xff4fb7,0x4bdbe8,0xb4db38,0x9f694c];
+    // Expanded (was 12) so the much bigger racer/traffic pools - which now repeat each
+    // distinct model several times - still get real color variety instead of cycling
+    // back through the same dozen tints too quickly.
+    const cars=[], colors=[0xffc400,0xe73635,0x178cff,0x15cc87,0xa754ee,0xff6b1b,0xf1f1f1,0x222a38,0xff4fb7,0x4bdbe8,0xb4db38,0x9f694c,0xff8f1f,0x2fd4c8,0xd63aff,0x6de83a,0x3a5fe8,0xe8c93a,0x8c8c8c,0x5ee8b0];
     const WHEEL_AXIS=new THREE.Vector3(1,0,0),wheelQ=new THREE.Quaternion();
     // Racer opponents (see AI_ROSTER below) used to cruise at 49/41, both well under the
     // player's plain non-boosted top speed (54, scaled 43-65 by car choice) - meaning a
@@ -298,10 +335,19 @@
     // Only some AI cars are actual racing rivals (ranked, lap-counted) - the rest is
     // ambient traffic sharing the road but not part of the race. Without a clear marker
     // the two were indistinguishable at a glance, so racers get a floating chevron above
-    // them and a distinct minimap dot. Each of the 7 AI racer slots now gets its OWN
-    // distinct model from the second pack instead of two models repeated - the roster
-    // array below is both "which asset" and "is it a racer" for every AI car at once.
-    const AI_ROSTER=[{assetIndex:7,racer:true},{assetIndex:8,racer:true},{assetIndex:9,racer:true},{assetIndex:10,racer:true},{assetIndex:12,racer:true},{assetIndex:13,racer:true},{assetIndex:16,racer:true},{assetIndex:3,racer:false},{assetIndex:4,racer:false},{assetIndex:5,racer:false},{assetIndex:6,racer:false}];
+    // them and a distinct minimap dot.
+    // Expanded per explicit request: 11 racers (was 7) and 5x the traffic (was 4, now
+    // 20) to fill out the much bigger track. Only 7 distinct racer models and 4 distinct
+    // traffic models exist, so both pools now repeat - `tint` marks every entry PAST
+    // the first full cycle through its own distinct-model pool, so the first occurrence
+    // of each model still uses its own default paint (as before) and only genuine
+    // repeats get an explicit recolor, keeping them visually distinguishable instead of
+    // looking like exact duplicates.
+    const RACER_ASSETS=[7,8,9,10,12,13,16],TRAFFIC_ASSETS=[3,4,5,6],AI_RACER_COUNT=11,AI_TRAFFIC_COUNT=TRAFFIC_ASSETS.length*5;
+    const AI_ROSTER=[
+      ...Array.from({length:AI_RACER_COUNT},(_,i)=>({assetIndex:RACER_ASSETS[i%RACER_ASSETS.length],racer:true,tint:i>=RACER_ASSETS.length})),
+      ...Array.from({length:AI_TRAFFIC_COUNT},(_,i)=>({assetIndex:TRAFFIC_ASSETS[i%TRAFFIC_ASSETS.length],racer:false,tint:i>=TRAFFIC_ASSETS.length}))
+    ];
     const markerCanvas=document.createElement('canvas');markerCanvas.width=markerCanvas.height=64;
     {const mctx=markerCanvas.getContext('2d');mctx.fillStyle='#fff';mctx.beginPath();mctx.moveTo(32,60);mctx.lineTo(6,12);mctx.lineTo(58,12);mctx.closePath();mctx.fill()}
     const markerTex=new THREE.CanvasTexture(markerCanvas);
@@ -361,14 +407,15 @@
       return{model,wheels,groundLift,sirenLights,box};
     }
     function makeCar(i){const root=new THREE.Group();scene.add(root);const rosterEntry=i===0?{assetIndex:0,racer:true}:AI_ROSTER[(i-1)%AI_ROSTER.length],assetIndex=rosterEntry.assetIndex,racer=rosterEntry.racer;
-      const visual=buildCarVisual(root,assetIndex,i>=7?colors[i]:null);
+      const visual=buildCarVisual(root,assetIndex,rosterEntry.tint?colors[i%colors.length]:null);
       if(racer&&i>0){const marker=new THREE.Sprite(markerMat);marker.scale.set(1.3,1.3,1.3);marker.position.set(0,visual.box.max.y+1.3,0);root.add(marker)}
       const st=spawnTransform(i);const c={root,model:visual.model,wheels:visual.wheels,groundLift:visual.groundLift,sirenLights:visual.sirenLights,racer,assetIndex,position:st.position,heading:st.heading,moveHeading:st.heading,speed:0,steer:0,_lastIdx:null,lapDist:0,progress:0,lap:1,ai:i>0,base:mphToMs(VEHICLE_TOP_MPH[assetIndex])*AI_CRUISE_FACTOR+(i%3)*1.5,laneOffset:((i%3)-1)*4.5,seed:i*7.31};cars.push(c);return c}
     // Re-skins the player's car in place (position/physics untouched) - used by the
     // vehicle-select screen so cycling through cars updates the live 3D preview.
     function setPlayerVehicle(assetIndex){const visual=buildCarVisual(player.root,assetIndex,null);player.model=visual.model;player.wheels=visual.wheels;player.groundLift=visual.groundLift;player.sirenLights=visual.sirenLights;player.assetIndex=assetIndex;player.rollVisual=0;
       const spec=VEHICLES.find(v=>v.assetIndex===assetIndex);player.statMods=spec?statMultipliers(spec):{topMs:mphToMs(150),accelMult:1,handlingMult:1}}
-    for(let i=0;i<12;i++)makeCar(i);const player=cars[0];
+    // Player + 11 racers + 20 traffic = 32 total, matching the expanded AI_ROSTER above.
+    for(let i=0;i<1+AI_ROSTER.length;i++)makeCar(i);const player=cars[0];
     function placeCar(c,dt=0){const driftAngle=angDelta(c.moveHeading,c.heading);c.root.position.set(c.position.x,c.position.y+c.groundLift,c.position.z);c.root.rotation.order='YXZ';c.root.rotation.y=c.heading;
       // Body roll/pitch are SMOOTHED toward their target (not snapped instantly) and
       // kept to a small range - the previous version set rotation.z directly from
@@ -768,7 +815,10 @@
         s.r+=(0.018+t*0.05);
         if(s.r>1){s.r=Math.random()*0.15;s.a=Math.random()*Math.PI*2}
         const cos=Math.cos(s.a),sin=Math.sin(s.a);
-        const inner=s.r*maxR*0.32,outer=inner+(28+t*170)*(0.5+s.r*0.5);
+        // Length now scales off maxR (the screen's own half-diagonal) instead of a small
+        // fixed pixel amount, so at speed the streaks genuinely run off the edges of the
+        // screen rather than stopping short partway across it regardless of display size.
+        const inner=s.r*maxR*0.32,outer=inner+maxR*(0.35+t*0.85)*(0.5+s.r*0.5);
         fxCtx.strokeStyle='rgba(170,238,255,'+(0.04+t*0.24*s.r).toFixed(3)+')';
         fxCtx.lineWidth=1+t*1.4;
         fxCtx.beginPath();fxCtx.moveTo(cx+cos*inner,cy+sin*inner);fxCtx.lineTo(cx+cos*outer,cy+sin*outer);fxCtx.stroke()
