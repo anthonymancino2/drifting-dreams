@@ -1,29 +1,30 @@
 // Port of index.html:679-774's unified keyboard/gamepad/touch input system.
-// The `drift` action is removed entirely (not repurposed) -- nothing in
-// phase 1 needs a handbrake/e-brake mechanic, and the touch slot it freed
-// becomes `nitroBtn` (nitro had no touch button at all before, a pre-existing
-// gap). The `KeyQ`/`KeyE` orbit-nudge keys and the canvas pointer-drag orbit
-// handlers are removed along with the dropped 360deg camera mode.
+// `drift` re-added on request (handbrake slide/handling feel, not the old
+// circuit racer's tiered mini-turbo/auto-boost reward system -- that stays
+// gone, the checkpoint-bonus score is the only scoring now). The
+// `KeyQ`/`KeyE` orbit-nudge keys and the canvas pointer-drag orbit handlers
+// stay removed along with the dropped 360deg camera mode.
 export const ACTIONS = [
   { id: 'left', label: 'Steer Left' },
   { id: 'right', label: 'Steer Right' },
   { id: 'gas', label: 'Accelerate' },
   { id: 'brake', label: 'Brake / Reverse' },
+  { id: 'drift', label: 'Handbrake Drift' },
   { id: 'nitro', label: 'Nitro Boost' },
   { id: 'camera', label: 'Cycle Camera' },
   { id: 'pause', label: 'Pause' }
 ];
-export const HELD_ACTIONS = ['left', 'right', 'gas', 'brake', 'nitro'];
+export const HELD_ACTIONS = ['left', 'right', 'gas', 'brake', 'drift', 'nitro'];
 export const KEY_ALT = { left: ['ArrowLeft'], right: ['ArrowRight'], gas: ['ArrowUp'], brake: ['ArrowDown'] };
-export const DEFAULT_KEYBINDS = { left: 'KeyA', right: 'KeyD', gas: 'KeyW', brake: 'KeyS', nitro: 'ShiftLeft', camera: 'KeyC', pause: 'Escape' };
+export const DEFAULT_KEYBINDS = { left: 'KeyA', right: 'KeyD', gas: 'KeyW', brake: 'KeyS', drift: 'Space', nitro: 'ShiftLeft', camera: 'KeyC', pause: 'Escape' };
 export const DEFAULT_GPBINDS = {
   left: { t: 'axis', i: 0, d: -1 }, right: { t: 'axis', i: 0, d: 1 },
   gas: { t: 'button', i: 7 }, brake: { t: 'button', i: 6 },
-  nitro: { t: 'button', i: 1 }, camera: { t: 'button', i: 3 }, pause: { t: 'button', i: 9 }
+  drift: { t: 'button', i: 0 }, nitro: { t: 'button', i: 1 }, camera: { t: 'button', i: 3 }, pause: { t: 'button', i: 9 }
 };
 const GP_BUTTON_NAMES = ['Cross', 'Circle', 'Square', 'Triangle', 'L1', 'R1', 'L2', 'R2', 'Share', 'Options', 'L3', 'R3', 'D-Up', 'D-Down', 'D-Left', 'D-Right', 'PS'];
-export const TOUCH_BTN_IDS = ['left', 'right', 'gas', 'brake', 'nitroBtn', 'camBtn'];
-export const TOUCH_BTN_SIZE = { left: 74, right: 74, gas: 82, brake: 65, nitroBtn: 68, camBtn: 66 };
+export const TOUCH_BTN_IDS = ['left', 'right', 'gas', 'brake', 'driftBtn', 'nitroBtn', 'camBtn'];
+export const TOUCH_BTN_SIZE = { left: 74, right: 74, gas: 82, brake: 65, driftBtn: 68, nitroBtn: 60, camBtn: 60 };
 
 function loadJSON(key, fallback) {
   try {
@@ -203,7 +204,7 @@ export class InputManager {
   }
 
   _bindTouchButtons() {
-    for (const [id, k] of [['left', 'left'], ['right', 'right'], ['gas', 'gas'], ['brake', 'brake'], ['nitroBtn', 'nitro']]) {
+    for (const [id, k] of [['left', 'left'], ['right', 'right'], ['gas', 'gas'], ['brake', 'brake'], ['driftBtn', 'drift'], ['nitroBtn', 'nitro']]) {
       const b = this.$(id);
       const set = v => { this.touchHeld[k] = v; b.classList.toggle('on', v); };
       b.addEventListener('pointerdown', e => { if (this.layoutEditing) return; e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (err) { } set(true); });

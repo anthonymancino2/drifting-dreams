@@ -18,6 +18,7 @@ import { RaceManager } from './race/RaceManager.js';
 import { checkPlayerTrafficCollisions } from './collision/CollisionSystem.js';
 import { InputManager } from './core/InputManager.js';
 import { HUD, mpsToMph } from './hud/HUD.js';
+import { SmokeSystem, SkidMarkSystem } from './effects/DriftEffects.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('game');
@@ -112,7 +113,7 @@ function updateSpeedFx(speedAbs) {
 let mode = 'attract';
 let raceTime = 0, countdown = 3.7, paused = false;
 let vehiclePickIndex = 0;
-let player, trafficManager, opposingTraffic, ring, cameraManager, raceManager, hud, carAssets;
+let player, trafficManager, opposingTraffic, ring, cameraManager, raceManager, hud, carAssets, driftEffects;
 const SHOWCASE_POS = new THREE.Vector3(0, -4.3, 0);
 
 function showScreen(id) {
@@ -146,6 +147,7 @@ async function boot() {
   raceManager = new RaceManager(ring, GAME_CONFIG);
   hud = new HUD($);
   hud.buildMinimap(ring, raceManager.checkpoints);
+  driftEffects = { smoke: new SmokeSystem(scene), skid: new SkidMarkSystem(scene) };
 
   setupInput();
   renderVehicleRow();
@@ -300,13 +302,15 @@ function tick() {
     });
   } else { // race
     raceTime += dt;
-    player.update(dt, input.input, ring, GAME_CONFIG);
+    player.update(dt, input.input, ring, GAME_CONFIG, driftEffects);
     trafficManager.update(dt, player.arc, raceTime);
     opposingTraffic.update(dt, player.arc, raceTime);
     checkPlayerTrafficCollisions(player, trafficManager, ring, GAME_CONFIG, () => raceManager.registerTrafficHit());
     raceManager.update(dt, player.arc);
     const speedAbs = cameraManager.update(dt, player);
     updateSpeedFx(speedAbs);
+    driftEffects.smoke.update(dt);
+    driftEffects.skid.update(dt);
     player.placeVisual(dt, raceTime);
 
     const events = raceManager.consumeEvents();

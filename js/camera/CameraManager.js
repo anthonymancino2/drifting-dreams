@@ -51,6 +51,15 @@ export class CameraManager {
 
     this.camera.position.lerp(this._camDesired, 1 - Math.exp(-dt * this.cfg.followLerpRate));
     this.camera.lookAt(this._look);
+
+    // Widen FOV with how hard the player is actually sliding (not raw
+    // speed) -- sells a big drift angle as more dramatic without the view
+    // changing just because the car is going fast.
+    const driftMag = player._driftActive ? Math.abs(angDelta(player.moveHeading, player.heading)) : 0;
+    const fovTarget = this.cfg.baseFov + Math.min(driftMag * (this.cfg.driftFovBoost / 1.35), this.cfg.driftFovBoost);
+    this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, fovTarget, dt * 5);
+    this.camera.updateProjectionMatrix();
+
     return speedAbs;
   }
 }

@@ -16,12 +16,19 @@ export const GAME_CONFIG = {
     yawResponse: 10.5, yawResponseRecover: 7.5,
     grip: 12.5,
     reverseSpeed: -8,
-    nitro: { maxBoostMultiplier: 1.25, drainPerSec: .24, rechargePerSec: .004 }
+    nitro: { maxBoostMultiplier: 1.25, drainPerSec: .24, rechargePerSec: .004 },
+    // Handbrake slide/handling feel only -- no boost tiers, no drift score,
+    // that reward system stayed with the old circuit racer. This is purely
+    // about how the car handles: rear grip drops so the car steps out and
+    // holds an angle through a weave, at a small speed cost for the traction
+    // loss (not a bonus -- there's no scoring tied to this anymore).
+    drift: { minSpeed: 9, grip: 3.2, yawResponse: 6.5, dragBonus: .35, maxSlipAngle: 1.35 }
   },
   camera: {
     chaseDist: 6.4, chaseHeight: 2.35,
     hoodOffset: 1.1, hoodHeight: 1.22,
-    followLerpRate: 7
+    followLerpRate: 7,
+    baseFov: 65, driftFovBoost: 8
   },
   traffic: {
     laneChangeCooldownSec: 4,
