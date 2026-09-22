@@ -20,26 +20,39 @@
 // clearly should have registered. Projecting the raw position delta onto
 // the tangent/side vectors (which vary smoothly between adjacent samples,
 // unlike the cumulative arc length) sidesteps that quantization entirely.
-export function checkPlayerTrafficCollisions(player, trafficManager, ring, config, onHit) {
+//
+// Also detects close calls: passing within a wider (but still tight) band
+// around a car WITHOUT hitting it. Skill-reward feedback for tight weaving,
+// which otherwise gets no in-game recognition at all beyond "you didn't
+// crash." Debounced per car, same pattern as the hit cooldown, and
+// explicitly skipped on a frame that already registered a hit so one
+// contact can't also fire a close-call bonus.
+export function checkPlayerTrafficCollisions(player, trafficManager, ring, config, onHit, onCloseCall) {
   const cfg = config.collision;
   const playerInfo = ring.nearestSample(player.position, player._sampleHint);
 
   for (const car of trafficManager.activeCars) {
-    if (car._hitCooldown > 0) continue;
     const dx = car.position.x - player.position.x, dz = car.position.z - player.position.z;
-
     const longGap = Math.abs(dx * playerInfo.tangent.x + dz * playerInfo.tangent.z);
-    if (longGap > cfg.trafficHitLongGap) continue;
-
     const lateralGap = Math.abs(dx * playerInfo.side.x + dz * playerInfo.side.z);
-    if (lateralGap > cfg.trafficHitLateralGap) continue;
 
-    const dist = Math.max(.001, Math.hypot(dx, dz));
-    const nx = dx / dist, nz = dz / dist;
-    player.speed *= .93;
-    player.position.x -= nx * .12; player.position.z -= nz * .12;
-    car.position.x += nx * .12; car.position.z += nz * .12;
-    car._hitCooldown = cfg.hitCooldownSec;
-    onHit(car);
+    const isHit = longGap <= cfg.trafficHitLongGap && lateralGap <= cfg.trafficHitLateralGap;
+    if (isHit && car._hitCooldown <= 0) {
+      const dist = Math.max(.001, Math.hypot(dx, dz));
+      const nx = dx / dist, nz = dz / dist;
+      player.speed *= .93;
+      player.position.x -= nx * .12; player.position.z -= nz * .12;
+      car.position.x += nx * .12; car.position.z += nz * .12;
+      car._hitCooldown = cfg.hitCooldownSec;
+      car._closeCallCooldown = cfg.closeCall.cooldownSec;
+      onHit(car);
+      continue;
+    }
+
+    const isNear = longGap <= cfg.closeCall.longGap && lateralGap <= cfg.closeCall.lateralGap;
+    if (isNear && !isHit && car._closeCallCooldown <= 0) {
+      car._closeCallCooldown = cfg.closeCall.cooldownSec;
+      onCloseCall?.(car);
+    }
   }
 }

@@ -86,6 +86,7 @@ export class TrafficManager {
     car._sampleHint = null;
     car._laneChangeCooldown = this.rand() * this.cfg.traffic.laneChangeCooldownSec;
     car._hitCooldown = 0;
+    car._closeCallCooldown = 0;
     const lateral = this.ring.laneCenterOffset(laneIndex);
     const p = this.ring.pointAtArc(arc, lateral);
     car.position.copy(p);
@@ -101,6 +102,7 @@ export class TrafficManager {
     for (const car of this.pool) {
       if (!car.active) continue;
       if (car._hitCooldown > 0) car._hitCooldown = Math.max(0, car._hitCooldown - dt);
+      if (car._closeCallCooldown > 0) car._closeCallCooldown = Math.max(0, car._closeCallCooldown - dt);
       const distFromPlayer = this.ring.wrapArc(car.arc - playerArc);
       const isNear = Math.min(distFromPlayer, this.ring.length - distFromPlayer) < LOD_DISTANCE;
 

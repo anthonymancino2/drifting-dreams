@@ -125,6 +125,17 @@ export class HUD {
       scoreEl.classList.add(state.checkpointEvent === 'bonus' ? 'flash-bonus' : 'flash-miss');
     }
 
+    if (state.closeCall) {
+      const scoreEl = $('score');
+      scoreEl.classList.remove('flash-bonus');
+      void scoreEl.offsetWidth;
+      scoreEl.classList.add('flash-bonus');
+      const banner = $('closeCallBanner');
+      banner.classList.remove('show');
+      void banner.offsetWidth;
+      banner.classList.add('show');
+    }
+
     this._drawSpeedGauge(mph, state.boosting);
     this._drawMap(state.trafficCars, state.player);
   }

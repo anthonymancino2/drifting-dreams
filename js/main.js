@@ -112,6 +112,7 @@ function updateSpeedFx(speedAbs) {
 // --- Game state --------------------------------------------------------
 let mode = 'attract';
 let raceTime = 0, countdown = 3.7, paused = false;
+let slowMoTimer = 0;
 let vehiclePickIndex = 0;
 let player, trafficManager, opposingTraffic, ring, cameraManager, raceManager, hud, carAssets, driftEffects;
 const SHOWCASE_POS = new THREE.Vector3(0, -4.3, 0);
@@ -301,17 +302,31 @@ function tick() {
       boosting: false
     });
   } else { // race
-    raceTime += dt;
-    player.update(dt, input.input, ring, GAME_CONFIG, driftEffects);
-    trafficManager.update(dt, player.arc, raceTime);
-    opposingTraffic.update(dt, player.arc, raceTime);
-    checkPlayerTrafficCollisions(player, trafficManager, ring, GAME_CONFIG, () => raceManager.registerTrafficHit());
-    raceManager.update(dt, player.arc);
-    const speedAbs = cameraManager.update(dt, player);
+    // Close-call slow-mo: the timer itself always counts down in real time
+    // (so its duration is consistent regardless of the dip), but everything
+    // gameplay-affecting steps on the scaled gdt while it's active -- a
+    // brief "did that really just happen" beat after a tight dodge.
+    if (slowMoTimer > 0) slowMoTimer = Math.max(0, slowMoTimer - dt);
+    const gdt = slowMoTimer > 0 ? dt * GAME_CONFIG.collision.closeCall.slowMoScale : dt;
+
+    raceTime += gdt;
+    player.update(gdt, input.input, ring, GAME_CONFIG, driftEffects);
+    trafficManager.update(gdt, player.arc, raceTime);
+    opposingTraffic.update(gdt, player.arc, raceTime);
+    checkPlayerTrafficCollisions(player, trafficManager, ring, GAME_CONFIG,
+      () => raceManager.registerTrafficHit(),
+      () => {
+        raceManager.registerCloseCall();
+        cameraManager.kick(GAME_CONFIG.collision.closeCall.fovKick);
+        slowMoTimer = GAME_CONFIG.collision.closeCall.slowMoDurationSec;
+      }
+    );
+    raceManager.update(gdt, player.arc);
+    const speedAbs = cameraManager.update(gdt, player);
     updateSpeedFx(speedAbs);
-    driftEffects.smoke.update(dt);
-    driftEffects.skid.update(dt);
-    player.placeVisual(dt, raceTime);
+    driftEffects.smoke.update(gdt);
+    driftEffects.skid.update(gdt);
+    player.placeVisual(gdt, raceTime);
 
     const events = raceManager.consumeEvents();
     hud.update({
@@ -319,6 +334,7 @@ function tick() {
       speedLimitMph: GAME_CONFIG.road.speedLimitMph,
       checkpointSecRemaining: raceManager.segmentTimeRemaining,
       checkpointEvent: events.checkpoint,
+      closeCall: events.closeCall,
       trafficCars: trafficManager.activeCars,
       boosting: input.input.nitro && player.nitro > 0
     });

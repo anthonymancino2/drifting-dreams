@@ -31,6 +31,7 @@ export class TrafficVehicle {
     this._sampleHint = null;
     this._laneChangeCooldown = 0;
     this._hitCooldown = 0;
+    this._closeCallCooldown = 0;
     this._lodFrameOffset = Math.floor(Math.random() * 4);
   }
 }

@@ -10,7 +10,12 @@ export const GAME_CONFIG = {
     speedLimitMph: 65
   },
   player: {
-    accelGas: 18, accelNitro: 32, brakeDecel: 30,
+    // Cut ~33%/31% from the old values -- not a top-speed cap (topMph per
+    // vehicle is untouched, a hypercar still eventually hits 220), just a
+    // longer ramp to get there. Most actual driving now happens at a
+    // moderate, weave-friendly pace; full speed is for genuinely open
+    // stretches, not the default state.
+    accelGas: 12, accelNitro: 22, brakeDecel: 30,
     rollingDragBase: .65, rollingDragPerSpeed: .012,
     steerLerpRate: 14,
     yawResponse: 10.5, yawResponseRecover: 7.5,
@@ -33,9 +38,12 @@ export const GAME_CONFIG = {
   traffic: {
     laneChangeCooldownSec: 4,
     minFollowGap: 6,
-    timeHeadwaySec: 1.3,
+    timeHeadwaySec: 1.1,
     cruiseSpeedMphRange: [45, 68],
-    pool: { maxActive: 28, spawnAheadDist: 260, despawnBehindDist: 80 },
+    // Bumped from 28 -- with acceleration slowed down, the road needs
+    // consistently more to react to, not just brief flashes of traffic
+    // between long empty stretches.
+    pool: { maxActive: 36, spawnAheadDist: 260, despawnBehindDist: 80 },
     assetPool: [3, 4, 5, 6, 18],   // City Cab / Trailblazer / Commuter / Sedan LX + Cargo Van(18) as box-truck placeholder
     seed: 1337
   },
@@ -50,7 +58,18 @@ export const GAME_CONFIG = {
     trafficHitScorePenalty: 1,
     trafficHitBadRep: 1,
     hitCooldownSec: .5,
-    shoulderSpeedPenaltyPerSec: 2
+    shoulderSpeedPenaltyPerSec: 2,
+    // Close call: passing a car within this band WITHOUT hitting it (wider
+    // than the hit gaps above, still tight -- comfortably under half a lane
+    // width so it never fires for a car just cruising in the next lane
+    // over) rewards the actual skill of tight weaving, which otherwise gets
+    // no feedback at all beyond "nothing bad happened."
+    closeCall: {
+      longGap: 7.5, lateralGap: 2.6,
+      scoreBonus: 1, cooldownSec: 1.2,
+      slowMoScale: .82, slowMoDurationSec: .28,
+      fovKick: 6
+    }
   },
   race: {
     checkpointCount: 6,

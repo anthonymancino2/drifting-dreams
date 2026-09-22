@@ -14,6 +14,7 @@ export class CameraManager {
     this._camTarget = new THREE.Vector3();
     this._camDesired = new THREE.Vector3();
     this._look = new THREE.Vector3();
+    this._kickFov = 0;
   }
 
   get modeName() { return CAMERA_NAMES[this.mode]; }
@@ -22,6 +23,11 @@ export class CameraManager {
     this.mode = (this.mode + 1) % CAMERA_NAMES.length;
     return this.modeName;
   }
+
+  // A brief additive FOV punch for a one-off event (close call) rather than
+  // a sustained state like the drift widen below -- decays back to 0 on its
+  // own, doesn't need an "end" call.
+  kick(amount) { this._kickFov += amount; }
 
   update(dt, player) {
     const speedAbs = Math.abs(player.speed);
@@ -56,9 +62,10 @@ export class CameraManager {
     // speed) -- sells a big drift angle as more dramatic without the view
     // changing just because the car is going fast.
     const driftMag = player._driftActive ? Math.abs(angDelta(player.moveHeading, player.heading)) : 0;
-    const fovTarget = this.cfg.baseFov + Math.min(driftMag * (this.cfg.driftFovBoost / 1.35), this.cfg.driftFovBoost);
+    const fovTarget = this.cfg.baseFov + Math.min(driftMag * (this.cfg.driftFovBoost / 1.35), this.cfg.driftFovBoost) + this._kickFov;
     this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, fovTarget, dt * 5);
     this.camera.updateProjectionMatrix();
+    this._kickFov *= Math.exp(-dt * 6); // snap-decays back to 0 on its own, no "end kick" call needed
 
     return speedAbs;
   }

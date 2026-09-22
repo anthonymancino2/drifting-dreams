@@ -62,10 +62,16 @@ export class RaceManager {
     this.lastHitEvent = true;
   }
 
+  registerCloseCall() {
+    this.score += this.cfg.collision.closeCall.scoreBonus;
+    this.lastCloseCallEvent = true;
+  }
+
   consumeEvents() {
-    const events = { checkpoint: this.lastCheckpointEvent, hit: this.lastHitEvent };
+    const events = { checkpoint: this.lastCheckpointEvent, hit: this.lastHitEvent, closeCall: this.lastCloseCallEvent };
     this.lastCheckpointEvent = null;
     this.lastHitEvent = false;
+    this.lastCloseCallEvent = false;
     return events;
   }
 }
