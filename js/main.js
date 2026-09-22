@@ -42,18 +42,34 @@ composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 composer.setSize(innerWidth, innerHeight);
 
-const hemi = new THREE.HemisphereLight(0xbfe0ff, 0x7a8f5c, 1.6); scene.add(hemi);
-const ambient = new THREE.AmbientLight(0xfff6e6, .5); scene.add(ambient);
-const sun = new THREE.DirectionalLight(0xfff2d6, 2.0);
-sun.position.set(140, 220, 90); sun.castShadow = true;
+const hemi = new THREE.HemisphereLight(0x8a5fff, 0x2a1050, 1.8); scene.add(hemi);
+const ambient = new THREE.AmbientLight(0xb84bff, .55); scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xff8fe0, 1.6);
+sun.position.set(-140, 160, 90); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.left = sun.shadow.camera.bottom = -180; sun.shadow.camera.right = sun.shadow.camera.top = 180; sun.shadow.camera.far = 600;
 scene.add(sun);
-const sunBall = new THREE.Mesh(new THREE.SphereGeometry(38, 32, 32), new THREE.MeshBasicMaterial({ color: 0xfff6d0 }));
-sunBall.position.set(200, 150, -480); scene.add(sunBall);
-const retroDecor = new THREE.Group(); retroDecor.visible = false; scene.add(retroDecor); // no cyberpunk-era decor in us101, kept only so applyEnvironment's API stays uniform
+const sunBall = new THREE.Mesh(new THREE.SphereGeometry(38, 32, 32), new THREE.MeshBasicMaterial({ color: 0xff2fd0 }));
+sunBall.position.set(-200, 90, -480); scene.add(sunBall);
 
-const ground = new THREE.Mesh(new THREE.CircleGeometry(720, 96), new THREE.MeshStandardMaterial({ color: 0x6b7d5a, roughness: .95 }));
+// Cyberpunk retro decor (port of index.html:153-158): scanline bars stacked
+// behind the neon "sun", plus a wireframe magenta grid floor. Visibility is
+// theme-driven via applyEnvironment/retroVisible, not hardcoded here.
+const retroDecor = new THREE.Group(); scene.add(retroDecor);
+const sunBarMat = new THREE.MeshBasicMaterial({ color: 0x160c33 });
+for (let i = 0; i < 5; i++) {
+  const bw = 76 - i * 4, bh = 2.6 + i * .9;
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 4), sunBarMat);
+  bar.position.set(-200, 66 + i * 7.2, -479);
+  retroDecor.add(bar);
+}
+const grid = new THREE.Mesh(
+  new THREE.PlaneGeometry(2000, 2000, 40, 40),
+  new THREE.MeshBasicMaterial({ color: 0xff2fd0, wireframe: true, transparent: true, opacity: .22 })
+);
+grid.rotation.x = -Math.PI / 2; grid.position.y = -4.4; retroDecor.add(grid);
+
+const ground = new THREE.Mesh(new THREE.CircleGeometry(720, 96), new THREE.MeshStandardMaterial({ color: 0x0d0620, roughness: .95 }));
 ground.rotation.x = -Math.PI / 2; ground.position.y = -4.5; ground.receiveShadow = true; scene.add(ground);
 
 const roadGroup = new THREE.Group(); scene.add(roadGroup);
@@ -99,6 +115,11 @@ let player, trafficManager, ring, cameraManager, raceManager, hud, carAssets;
 const SHOWCASE_POS = new THREE.Vector3(0, -4.3, 0);
 
 function showScreen(id) {
+  // A menu <button> keeps browser focus after being clicked even once its
+  // screen is hidden -- without this, a later Space/Enter press natively
+  // "clicks" that still-focused button again (e.g. re-triggering START
+  // COMMUTE mid-race) since we never removed it from the DOM, just hid it.
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
   if (id) $(id).classList.remove('hidden');
 }

@@ -94,8 +94,8 @@ export class InputManager {
     addEventListener('keydown', e => {
       if (this.listeningFor && this.listeningFor.kind === 'key') {
         if (e.code !== 'Escape') { this.KEYBINDS[this.listeningFor.action] = e.code; this.saveBinds(); }
-        this.handlers.onRenderBindList?.();
         this.listeningFor = null;
+        this.handlers.onRenderBindList?.();
         e.preventDefault();
         return;
       }
@@ -173,7 +173,7 @@ export class InputManager {
       for (let i = 0; i < gp.buttons.length; i++) {
         if (gp.buttons[i].pressed && !(this.gpPrevPressed.buttons && this.gpPrevPressed.buttons[i])) {
           this.GPBINDS[this.listeningFor.action] = { t: 'button', i };
-          this.saveBinds(); this.handlers.onRenderBindList?.(); this.listeningFor = null;
+          this.saveBinds(); this.listeningFor = null; this.handlers.onRenderBindList?.();
           break;
         }
       }

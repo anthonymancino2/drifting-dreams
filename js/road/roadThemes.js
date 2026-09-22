@@ -4,20 +4,23 @@ import { cloneTint } from '../core/GltfUtils.js';
 // New freeway-appropriate theme, alongside (not replacing) the palette-driven
 // pattern from index.html:327-338 (THEME_PALETTES/applyEnvironment/
 // buildScenery) -- same technique, one config object swaps sky/fog/lighting/
-// scenery wholesale. Daytime NorCal palette: clear sky, light haze fog (long
-// freeway sightlines need less murk than the old tracks' fog), dry grass/
-// real asphalt colors, plain white/yellow lane markers instead of neon curbs.
+// scenery wholesale. Cyberpunk night palette: dark purple-to-magenta sky,
+// neon cyan/magenta lane markers and sound-wall glow, a hot-pink "sun" low on
+// the horizon, and the retro scanline-sun + wireframe grid floor from the
+// original cyberpunk track brought back (retroVisible:true) -- freeway
+// structure (lanes/guardrails/traffic) stays exactly the same, only the mood
+// changes.
 export const THEME_PALETTES = {
   us101: {
-    sky: ['#7fb8e8', '#a9d4f2', '#cfe8f7', '#e8f4fb', '#f5fbff'],
-    fog: 0xcfe0e8, fogDensity: .00012,
-    ground: 0x6b7d5a, shoulder: 0x8f8f92, road: 0x3c3c40,
-    curbA: 0xffffff, curbB: 0xffd400, curbEmissive: 0,
-    hemiSky: 0xbfe0ff, hemiGround: 0x7a8f5c, hemiIntensity: 1.6,
-    ambient: 0xfff6e6, ambientIntensity: .5,
-    sunColor: 0xfff2d6, sunIntensity: 2.0, sunPos: [140, 220, 90],
-    sunBallColor: 0xfff6d0, sunBallPos: [200, 150, -480],
-    retroVisible: false
+    sky: ['#05030f', '#170b3a', '#4a1568', '#c22fb0', '#ff7fd6'],
+    fog: 0x2a1148, fogDensity: .00016,
+    ground: 0x0d0620, shoulder: 0x1c1030, road: 0x140d24,
+    curbA: 0xff2fd0, curbB: 0x24f5ef, curbEmissive: 1.0,
+    hemiSky: 0x8a5fff, hemiGround: 0x2a1050, hemiIntensity: 1.8,
+    ambient: 0xb84bff, ambientIntensity: .55,
+    sunColor: 0xff8fe0, sunIntensity: 1.6, sunPos: [-140, 160, 90],
+    sunBallColor: 0xff2fd0, sunBallPos: [-200, 90, -480],
+    retroVisible: true
   }
 };
 
@@ -79,7 +82,7 @@ export function buildRoadSurface(theme, ring, roadGroup, scene, ground) {
   roadGroup.add(ribbon(ring, scene, roadHalf, 0, new THREE.MeshStandardMaterial({ color: pal.road, roughness: .7, metalness: .15, side: THREE.DoubleSide })));
 
   const dashGeo = new THREE.BoxGeometry(.22, .045, 3.6);
-  const dashMat = new THREE.MeshStandardMaterial({ color: 0xfff6d0, emissive: 0x000000, emissiveIntensity: 0 });
+  const dashMat = new THREE.MeshStandardMaterial({ color: 0x9df6ff, emissive: 0x24d8ff, emissiveIntensity: pal.curbEmissive * 1.4 });
   const dashCount = Math.max(60, Math.round(ring.length / 12));
   const laneBoundaryOffsets = [];
   for (let i = 1; i < ring.cfg.laneCount; i++) laneBoundaryOffsets.push(-roadHalf + ring.cfg.laneWidth * i);
@@ -104,13 +107,13 @@ export function buildRoadSurface(theme, ring, roadGroup, scene, ground) {
   for (let i = 0; i < curbCount; i++) {
     const u = i / curbCount, { p, t, side } = ring.frame(u), yaw = Math.atan2(t.x, t.z);
     for (const edge of [-1, 1]) {
-      const m = new THREE.Mesh(curbGeo, curbMats[0]);
+      const m = new THREE.Mesh(curbGeo, curbMats[edge < 0 ? 0 : 1]);
       m.position.copy(p).addScaledVector(side, edge * (roadHalf + .25)); m.position.y += .05; m.rotation.y = yaw;
       m.receiveShadow = true; roadGroup.add(m);
     }
   }
 
-  const railMat = new THREE.MeshStandardMaterial({ color: 0xaebbc1, metalness: .75, roughness: .26 });
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x8a7fb0, metalness: .75, roughness: .26 });
   const railGeo = new THREE.BoxGeometry(.18, .2, 5.3), postGeo = new THREE.BoxGeometry(.18, 1.05, .18);
   const railCount = Math.max(50, Math.round(ring.length / 12));
   for (let i = 0; i < railCount; i++) {
@@ -138,11 +141,21 @@ function placeClearOfRoad(ring, u, edge, baseDist, halfExtent) {
 }
 
 function makeFreewayTree(seed, treeAsset) {
-  const t = cloneTint(treeAsset, null); // no hue shift -- natural green, unlike sakura's blossom tint
+  // cloneTint's name-based PAINT regex only matches car paint slots, not
+  // foliage materials, so re-tinting a tree needs the same color-heuristic
+  // approach the old sakura tree used (detect "greenish" materials by value)
+  // -- here shifting them to a dark violet silhouette instead of blossom pink,
+  // so trees read as shapes against the neon night sky rather than daylight
+  // roadside planting.
+  const t = cloneTint(treeAsset, null);
+  const hue = seed % 2 ? 0x1a1030 : 0x231640;
   t.traverse(x => {
     if (!x.isMesh) return;
     for (const m of Array.isArray(x.material) ? x.material : [x.material]) {
       if ('metalness' in m) m.metalness = Math.min(m.metalness, .1);
+      if (!m.color) continue;
+      const c = m.color;
+      if (c.g > c.r * .9 && c.g > c.b * .9) { m.color.set(hue); if ('roughness' in m) m.roughness = Math.max(m.roughness, .7); }
     }
   });
   const scale = 2.0 + (seed % 5) * .4;
@@ -153,7 +166,7 @@ function makeFreewayTree(seed, treeAsset) {
 function makeHill(radius, height, seed) {
   const cone = new THREE.Mesh(
     new THREE.ConeGeometry(radius, height, 7, 1),
-    new THREE.MeshStandardMaterial({ color: seed % 2 ? 0x8a9f6a : 0x97ab74, roughness: 1, flatShading: true })
+    new THREE.MeshStandardMaterial({ color: seed % 2 ? 0x2a1a45 : 0x351f52, roughness: 1, flatShading: true })
   );
   cone.position.y = height / 2; cone.rotation.y = seed;
   return cone;
@@ -173,8 +186,10 @@ export function buildScenery(theme, ring, groups, assets) {
   const maxExtent = Math.max(...ring.points.map(p => Math.hypot(p.x, p.z)));
   const skylineRadius = maxExtent + 950;
 
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xb7b2a6, roughness: .9 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x241a3a, roughness: .8 });
   const wallGeo = new THREE.BoxGeometry(8, 4, .3);
+  const neonMats = [new THREE.MeshBasicMaterial({ color: 0xff2fd0 }), new THREE.MeshBasicMaterial({ color: 0x24f5ef })];
+  const neonGeo = new THREE.BoxGeometry(8, .12, .34);
   const wallCount = Math.max(40, Math.round(ring.length / 26));
   for (let i = 0; i < wallCount; i++) {
     const u = i / wallCount, edge = i % 2 ? 1 : -1;
@@ -186,6 +201,10 @@ export function buildScenery(theme, ring, groups, assets) {
     wall.rotation.y = Math.atan2(s.t.x, s.t.z);
     wall.castShadow = true; wall.receiveShadow = true;
     roadBuildings.add(wall);
+    // Neon trim strip along the top edge, per-panel alternating magenta/cyan.
+    const neon = new THREE.Mesh(neonGeo, neonMats[i % 2]);
+    neon.position.copy(wall.position); neon.position.y += 2.02; neon.rotation.y = wall.rotation.y;
+    roadBuildings.add(neon);
   }
 
   const treeCount = Math.max(20, Math.round(ring.length / 70)); // much sparser than sakura's trackLength/22
