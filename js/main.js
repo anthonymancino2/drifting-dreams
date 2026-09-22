@@ -12,6 +12,7 @@ import { FreewayRing } from './road/FreewayRing.js';
 import { applyEnvironment, buildRoadSurface, buildScenery, makeSkyTexture, THEME_PALETTES } from './road/roadThemes.js';
 import { PlayerVehicle } from './player/PlayerVehicle.js';
 import { TrafficManager } from './traffic/TrafficManager.js';
+import { OpposingTraffic } from './traffic/OpposingTraffic.js';
 import { CameraManager } from './camera/CameraManager.js';
 import { RaceManager } from './race/RaceManager.js';
 import { checkPlayerTrafficCollisions } from './collision/CollisionSystem.js';
@@ -111,7 +112,7 @@ function updateSpeedFx(speedAbs) {
 let mode = 'attract';
 let raceTime = 0, countdown = 3.7, paused = false;
 let vehiclePickIndex = 0;
-let player, trafficManager, ring, cameraManager, raceManager, hud, carAssets;
+let player, trafficManager, opposingTraffic, ring, cameraManager, raceManager, hud, carAssets;
 const SHOWCASE_POS = new THREE.Vector3(0, -4.3, 0);
 
 function showScreen(id) {
@@ -138,6 +139,8 @@ async function boot() {
 
   trafficManager = new TrafficManager(scene, ring, GAME_CONFIG, carAssets);
   trafficManager.spawnInitial(0);
+  opposingTraffic = new OpposingTraffic(scene, ring, GAME_CONFIG.road, carAssets);
+  opposingTraffic.spawnInitial(0);
 
   cameraManager = new CameraManager(camera, GAME_CONFIG);
   raceManager = new RaceManager(ring, GAME_CONFIG);
@@ -189,6 +192,7 @@ function resetRace() {
   player._sampleHint = null; player._shoulderRecoverTimer = 0;
 
   trafficManager.spawnInitial(0);
+  opposingTraffic.spawnInitial(0);
   raceManager = new RaceManager(ring, GAME_CONFIG);
   hud.buildMinimap(ring, raceManager.checkpoints);
   cameraManager.mode = 0;
@@ -274,6 +278,7 @@ function tick() {
   if (mode === 'attract' || mode === 'controls' || mode === 'vehicleSelect') {
     raceTime += dt;
     trafficManager.update(dt, 0, raceTime);
+    opposingTraffic.update(dt, 0, raceTime);
     updateShowcase(dt);
   } else if (mode === 'countdown') {
     countdown -= dt;
@@ -282,6 +287,7 @@ function tick() {
     $('banner').classList.add('show');
     if (countdown <= 0) { mode = 'race'; input.setMode(mode); setTimeout(() => { if (!paused) $('banner').classList.remove('show'); }, 650); }
     trafficManager.update(dt, player.arc, raceTime);
+    opposingTraffic.update(dt, player.arc, raceTime);
     cameraManager.update(dt, player);
     player.placeVisual(dt, raceTime);
     hud.update({
@@ -296,7 +302,8 @@ function tick() {
     raceTime += dt;
     player.update(dt, input.input, ring, GAME_CONFIG);
     trafficManager.update(dt, player.arc, raceTime);
-    checkPlayerTrafficCollisions(player, trafficManager, GAME_CONFIG, () => raceManager.registerTrafficHit());
+    opposingTraffic.update(dt, player.arc, raceTime);
+    checkPlayerTrafficCollisions(player, trafficManager, ring, GAME_CONFIG, () => raceManager.registerTrafficHit());
     raceManager.update(dt, player.arc);
     const speedAbs = cameraManager.update(dt, player);
     updateSpeedFx(speedAbs);

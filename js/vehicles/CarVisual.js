@@ -45,17 +45,20 @@ export function buildCarVisual(root, assetIndex, tintColor, carAssets) {
   // panes, not real dynamic lights, so this scales fine to the whole traffic
   // pool). +Z is the front of the car (matches the wheel front-detection
   // convention above and updatePlayer/driveAI's forward-motion convention).
-  const lampW = (box.max.x - box.min.x) * .16, lampH = lampW * .55;
-  const lampY = box.min.y + (box.max.y - box.min.y) * .3;
-  const lampX = (box.max.x - box.min.x) * .32;
+  const lampW = (box.max.x - box.min.x) * .13, lampH = lampW * .5;
+  // .3 measured too low in practice -- landed near the wheel/bumper edge
+  // instead of the rear fascia. .52 sits mid-body, roughly where a real
+  // light cluster is.
+  const lampY = box.min.y + (box.max.y - box.min.y) * .52;
+  const lampX = (box.max.x - box.min.x) * .3;
   const headlightMat = new THREE.MeshBasicMaterial({ color: 0xfff6d8 });
   const taillightMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
   for (const xSign of [-1, 1]) {
     const headlight = new THREE.Mesh(new THREE.BoxGeometry(lampW, lampH, .06), headlightMat);
-    headlight.position.set(xSign * lampX, lampY, box.max.z + .03);
+    headlight.position.set(xSign * lampX, lampY, box.max.z - .05);
     root.add(headlight);
     const taillight = new THREE.Mesh(new THREE.BoxGeometry(lampW, lampH, .06), taillightMat);
-    taillight.position.set(xSign * lampX, lampY, box.min.z - .03);
+    taillight.position.set(xSign * lampX, lampY, box.min.z + .05);
     root.add(taillight);
   }
 

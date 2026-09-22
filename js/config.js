@@ -33,7 +33,13 @@ export const GAME_CONFIG = {
     seed: 1337
   },
   collision: {
-    trafficHitDistance: 3.2,
+    // Longitudinal (along-road) and lateral (across-lane) gaps checked
+    // separately -- see CollisionSystem.js for why a single circular radius
+    // doesn't work here. ~4.2 is roughly one car length (nose-to-tail
+    // contact in the same lane); ~1.7 is roughly two cars' combined
+    // half-widths (genuine side overlap, not just "in the next lane over").
+    trafficHitLongGap: 4.2,
+    trafficHitLateralGap: 1.7,
     trafficHitScorePenalty: 1,
     trafficHitBadRep: 1,
     hitCooldownSec: .5,

@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { cloneTint } from '../core/GltfUtils.js';
 
+// Gap between the main carriageway's shoulder and the opposing carriageway's
+// shoulder -- shared with OpposingTraffic.js so the visual road and the cars
+// driving on it agree on where it actually is.
+export const MEDIAN_GAP = 10;
+
 // New freeway-appropriate theme, alongside (not replacing) the palette-driven
 // pattern from index.html:327-338 (THEME_PALETTES/applyEnvironment/
 // buildScenery) -- same technique, one config object swaps sky/fog/lighting/
@@ -47,13 +52,16 @@ export function applyEnvironment(theme, env) {
   env.retroDecor.visible = pal.retroVisible;
 }
 
-function ribbon(ring, scene, width, yOffset, material, segments = 720) {
+// centerOffset shifts the whole strip sideways from the ring's own
+// centerline -- used to build the opposing carriageway as a second strip
+// running parallel to the main one, on the same underlying curve.
+function ribbon(ring, scene, halfWidth, yOffset, material, segments = 720, centerOffset = 0) {
   const pos = [], uv = [], idx = [];
   const vA = new THREE.Vector3();
   for (let i = 0; i <= segments; i++) {
     const u = i / segments, { p, side } = ring.frame(u);
     for (const x of [-1, 1]) {
-      vA.copy(p).addScaledVector(side, width * x); vA.y += yOffset;
+      vA.copy(p).addScaledVector(side, centerOffset + halfWidth * x); vA.y += yOffset;
       pos.push(vA.x, vA.y, vA.z); uv.push((x + 1) / 2, u * 65);
     }
   }
@@ -131,6 +139,37 @@ export function buildRoadSurface(theme, ring, roadGroup, scene, ground) {
       roadGroup.add(r);
       if (i % 2 === 0) { const post = new THREE.Mesh(postGeo, railMat); post.position.copy(r.position); post.position.y -= .42; roadGroup.add(post); }
     }
+  }
+
+  // Opposing carriageway: a second parallel strip across the median, purely
+  // visual (OpposingTraffic.js drives the cars on it) -- reuses the same
+  // ring curve, just offset further out. The main carriageway's own +1-edge
+  // guardrail (built above) already serves as the near-side median barrier;
+  // this only needs the far-side one plus the opposing asphalt/shoulder/lane
+  // markings mirroring the main road's.
+  const oppCenter = ring.halfWidth + MEDIAN_GAP + roadHalf;
+  roadGroup.add(ribbon(ring, scene, ring.halfWidth, -.18, new THREE.MeshStandardMaterial({ color: pal.shoulder, roughness: .85, side: THREE.DoubleSide }), 720, oppCenter));
+  roadGroup.add(ribbon(ring, scene, roadHalf, 0, new THREE.MeshStandardMaterial({ color: pal.road, roughness: .7, metalness: .15, side: THREE.DoubleSide }), 720, oppCenter));
+
+  const oppLaneBoundaryOffsets = laneBoundaryOffsets.map(o => o + oppCenter);
+  const oppDashes = new THREE.InstancedMesh(dashGeo, dashMat, dashCount * Math.max(1, oppLaneBoundaryOffsets.length));
+  let odi = 0;
+  for (let i = 0; i < dashCount; i++) {
+    const u = i / dashCount, { p, t, side } = ring.frame(u), yaw = Math.atan2(t.x, t.z);
+    for (const lane of oppLaneBoundaryOffsets) {
+      dummy.position.copy(p).addScaledVector(side, lane); dummy.position.y += .09;
+      dummy.rotation.set(0, yaw, 0); dummy.updateMatrix(); oppDashes.setMatrixAt(odi++, dummy.matrix);
+    }
+  }
+  oppDashes.count = odi;
+  oppDashes.receiveShadow = true; roadGroup.add(oppDashes);
+
+  for (let i = 0; i < railCount; i++) {
+    const u = i / railCount, { p, t, side } = ring.frame(u), yaw = Math.atan2(t.x, t.z);
+    const r = new THREE.Mesh(railGeo, railMat);
+    r.position.copy(p).addScaledVector(side, oppCenter + ring.halfWidth + .5); r.position.y += .78; r.rotation.y = yaw; r.castShadow = true;
+    roadGroup.add(r);
+    if (i % 2 === 0) { const post = new THREE.Mesh(postGeo, railMat); post.position.copy(r.position); post.position.y -= .42; roadGroup.add(post); }
   }
 }
 
