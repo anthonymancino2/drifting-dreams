@@ -14,11 +14,11 @@ export const THEME_PALETTES = {
   us101: {
     sky: ['#05030f', '#170b3a', '#4a1568', '#c22fb0', '#ff7fd6'],
     fog: 0x2a1148, fogDensity: .00016,
-    ground: 0x1c1030, shoulder: 0x322450, road: 0x281e3c,
+    ground: 0x281c40, shoulder: 0x3f2e58, road: 0x352a4a,
     curbA: 0xd93fc0, curbB: 0x2fb8c4, curbEmissive: .12,
-    hemiSky: 0x9a7fff, hemiGround: 0x3a1868, hemiIntensity: 2.0,
-    ambient: 0xc86bff, ambientIntensity: .7,
-    sunColor: 0xff9fe6, sunIntensity: 1.8, sunPos: [-140, 160, 90],
+    hemiSky: 0xaf9aff, hemiGround: 0x4a2278, hemiIntensity: 2.8,
+    ambient: 0xd68bff, ambientIntensity: 1.0,
+    sunColor: 0xffb0ec, sunIntensity: 2.4, sunPos: [-140, 160, 90],
     sunBallColor: 0xff2fd0, sunBallPos: [-200, 90, -480],
     retroVisible: true
   }

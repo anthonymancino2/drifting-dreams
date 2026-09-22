@@ -30,7 +30,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPrefere
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8));
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.55;
 
 const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, .08, 3200);
 const clock = new THREE.Clock();
@@ -42,9 +42,9 @@ composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 composer.setSize(innerWidth, innerHeight);
 
-const hemi = new THREE.HemisphereLight(0x9a7fff, 0x3a1868, 2.0); scene.add(hemi);
-const ambient = new THREE.AmbientLight(0xc86bff, .7); scene.add(ambient);
-const sun = new THREE.DirectionalLight(0xff9fe6, 1.8);
+const hemi = new THREE.HemisphereLight(0xaf9aff, 0x4a2278, 2.8); scene.add(hemi);
+const ambient = new THREE.AmbientLight(0xd68bff, 1.0); scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xffb0ec, 2.4);
 sun.position.set(-140, 160, 90); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.left = sun.shadow.camera.bottom = -180; sun.shadow.camera.right = sun.shadow.camera.top = 180; sun.shadow.camera.far = 600;
@@ -69,7 +69,7 @@ const grid = new THREE.Mesh(
 );
 grid.rotation.x = -Math.PI / 2; grid.position.y = -4.4; retroDecor.add(grid);
 
-const ground = new THREE.Mesh(new THREE.CircleGeometry(720, 96), new THREE.MeshStandardMaterial({ color: 0x1c1030, roughness: .95 }));
+const ground = new THREE.Mesh(new THREE.CircleGeometry(720, 96), new THREE.MeshStandardMaterial({ color: 0x281c40, roughness: .95 }));
 ground.rotation.x = -Math.PI / 2; ground.position.y = -4.5; ground.receiveShadow = true; scene.add(ground);
 
 const roadGroup = new THREE.Group(); scene.add(roadGroup);

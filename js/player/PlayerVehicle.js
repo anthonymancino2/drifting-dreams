@@ -41,6 +41,24 @@ export class PlayerVehicle {
     this.assetIndex = assetIndex;
     const spec = vehicleByAssetIndex(assetIndex);
     this.statMods = spec ? statMultipliers(spec) : { topMs: mphToMs(150), accelMult: 1, handlingMult: 1 };
+
+    // Real headlights for the player only -- traffic gets the cheap unlit
+    // glow meshes from buildCarVisual, but only one player exists, so a pair
+    // of actual lights actually illuminating the road ahead is affordable
+    // and directly helps night visibility (not just cosmetic).
+    // buildCarVisual already cleared root's old children (including any
+    // previous headlight/target objects), so these are recreated fresh here.
+    const box = visual.box, lampX = (box.max.x - box.min.x) * .32, lampY = box.min.y + (box.max.y - box.min.y) * .3;
+    this.headlights = [-1, 1].map(xSign => {
+      const light = new THREE.SpotLight(0xfff2d0, 6, 55, Math.PI / 6.5, .55, 1.3);
+      light.position.set(xSign * lampX, lampY, box.max.z);
+      light.castShadow = false;
+      const target = new THREE.Object3D();
+      target.position.set(xSign * lampX * .4, lampY - 1.2, box.max.z + 30);
+      light.target = target;
+      this.root.add(light, target);
+      return light;
+    });
   }
 
   update(dt, input, ring, config) {

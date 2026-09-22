@@ -41,6 +41,24 @@ export function buildCarVisual(root, assetIndex, tintColor, carAssets) {
   const box = new THREE.Box3().setFromObject(model), groundLift = -box.min.y + .02;
   root.position.copy(savedPos); root.rotation.copy(savedRot);
 
+  // Headlight/taillight glow -- every car gets these (cheap unlit emissive
+  // panes, not real dynamic lights, so this scales fine to the whole traffic
+  // pool). +Z is the front of the car (matches the wheel front-detection
+  // convention above and updatePlayer/driveAI's forward-motion convention).
+  const lampW = (box.max.x - box.min.x) * .16, lampH = lampW * .55;
+  const lampY = box.min.y + (box.max.y - box.min.y) * .3;
+  const lampX = (box.max.x - box.min.x) * .32;
+  const headlightMat = new THREE.MeshBasicMaterial({ color: 0xfff6d8 });
+  const taillightMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+  for (const xSign of [-1, 1]) {
+    const headlight = new THREE.Mesh(new THREE.BoxGeometry(lampW, lampH, .06), headlightMat);
+    headlight.position.set(xSign * lampX, lampY, box.max.z + .03);
+    root.add(headlight);
+    const taillight = new THREE.Mesh(new THREE.BoxGeometry(lampW, lampH, .06), taillightMat);
+    taillight.position.set(xSign * lampX, lampY, box.min.z - .03);
+    root.add(taillight);
+  }
+
   let sirenLights = null;
   if (assetIndex === 2 || assetIndex === 16) {
     const barW = (box.max.x - box.min.x) * .55, barY = box.max.y + .08, barZ = (box.min.z + box.max.z) / 2 - (box.max.z - box.min.z) * .12;
