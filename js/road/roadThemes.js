@@ -15,10 +15,10 @@ export const THEME_PALETTES = {
     sky: ['#05030f', '#170b3a', '#4a1568', '#c22fb0', '#ff7fd6'],
     fog: 0x2a1148, fogDensity: .00016,
     ground: 0x0d0620, shoulder: 0x1c1030, road: 0x140d24,
-    curbA: 0xff2fd0, curbB: 0x24f5ef, curbEmissive: 1.0,
-    hemiSky: 0x8a5fff, hemiGround: 0x2a1050, hemiIntensity: 1.8,
-    ambient: 0xb84bff, ambientIntensity: .55,
-    sunColor: 0xff8fe0, sunIntensity: 1.6, sunPos: [-140, 160, 90],
+    curbA: 0xd93fc0, curbB: 0x2fb8c4, curbEmissive: .12,
+    hemiSky: 0x8a5fff, hemiGround: 0x2a1050, hemiIntensity: 1.2,
+    ambient: 0xb84bff, ambientIntensity: .38,
+    sunColor: 0xff8fe0, sunIntensity: 1.2, sunPos: [-140, 160, 90],
     sunBallColor: 0xff2fd0, sunBallPos: [-200, 90, -480],
     retroVisible: true
   }
@@ -81,8 +81,11 @@ export function buildRoadSurface(theme, ring, roadGroup, scene, ground) {
   roadGroup.add(ribbon(ring, scene, ring.halfWidth, -.18, new THREE.MeshStandardMaterial({ color: pal.shoulder, roughness: .85, side: THREE.DoubleSide })));
   roadGroup.add(ribbon(ring, scene, roadHalf, 0, new THREE.MeshStandardMaterial({ color: pal.road, roughness: .7, metalness: .15, side: THREE.DoubleSide })));
 
+  // Plain reflective lane paint, not a light source -- a small emissive kick
+  // (not a full neon glow) is enough to read as "lit road markings at night"
+  // without turning the lanes into strobing light bars.
   const dashGeo = new THREE.BoxGeometry(.22, .045, 3.6);
-  const dashMat = new THREE.MeshStandardMaterial({ color: 0x9df6ff, emissive: 0x24d8ff, emissiveIntensity: pal.curbEmissive * 1.4 });
+  const dashMat = new THREE.MeshStandardMaterial({ color: 0xd8e6ea, emissive: 0x6fb8c2, emissiveIntensity: .25 });
   const dashCount = Math.max(60, Math.round(ring.length / 12));
   const laneBoundaryOffsets = [];
   for (let i = 1; i < ring.cfg.laneCount; i++) laneBoundaryOffsets.push(-roadHalf + ring.cfg.laneWidth * i);
@@ -103,7 +106,7 @@ export function buildRoadSurface(theme, ring, roadGroup, scene, ground) {
     new THREE.MeshStandardMaterial({ color: pal.curbA, emissive: pal.curbA, emissiveIntensity: pal.curbEmissive }),
     new THREE.MeshStandardMaterial({ color: pal.curbB, emissive: pal.curbB, emissiveIntensity: pal.curbEmissive })
   ];
-  const curbCount = Math.max(80, Math.round(ring.length / 9));
+  const curbCount = Math.max(60, Math.round(ring.length / 22));
   for (let i = 0; i < curbCount; i++) {
     const u = i / curbCount, { p, t, side } = ring.frame(u), yaw = Math.atan2(t.x, t.z);
     for (const edge of [-1, 1]) {
@@ -113,7 +116,11 @@ export function buildRoadSurface(theme, ring, roadGroup, scene, ground) {
     }
   }
 
-  const railMat = new THREE.MeshStandardMaterial({ color: 0x8a7fb0, metalness: .75, roughness: .26 });
+  // Low metalness/high roughness on purpose -- a shiny rail throws sharp
+  // specular glints as each post passes the camera, which bloom turns into a
+  // rapid strobe effect while driving. Matte reads as metal at night just
+  // fine without the flashing.
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x8a7fb0, metalness: .2, roughness: .75 });
   const railGeo = new THREE.BoxGeometry(.18, .2, 5.3), postGeo = new THREE.BoxGeometry(.18, 1.05, .18);
   const railCount = Math.max(50, Math.round(ring.length / 12));
   for (let i = 0; i < railCount; i++) {
@@ -188,8 +195,6 @@ export function buildScenery(theme, ring, groups, assets) {
 
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x241a3a, roughness: .8 });
   const wallGeo = new THREE.BoxGeometry(8, 4, .3);
-  const neonMats = [new THREE.MeshBasicMaterial({ color: 0xff2fd0 }), new THREE.MeshBasicMaterial({ color: 0x24f5ef })];
-  const neonGeo = new THREE.BoxGeometry(8, .12, .34);
   const wallCount = Math.max(40, Math.round(ring.length / 26));
   for (let i = 0; i < wallCount; i++) {
     const u = i / wallCount, edge = i % 2 ? 1 : -1;
@@ -201,10 +206,6 @@ export function buildScenery(theme, ring, groups, assets) {
     wall.rotation.y = Math.atan2(s.t.x, s.t.z);
     wall.castShadow = true; wall.receiveShadow = true;
     roadBuildings.add(wall);
-    // Neon trim strip along the top edge, per-panel alternating magenta/cyan.
-    const neon = new THREE.Mesh(neonGeo, neonMats[i % 2]);
-    neon.position.copy(wall.position); neon.position.y += 2.02; neon.rotation.y = wall.rotation.y;
-    roadBuildings.add(neon);
   }
 
   const treeCount = Math.max(20, Math.round(ring.length / 70)); // much sparser than sakura's trackLength/22

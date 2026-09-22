@@ -37,14 +37,14 @@ const clock = new THREE.Clock();
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .5, .4, .92);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .22, .3, .97);
 composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 composer.setSize(innerWidth, innerHeight);
 
-const hemi = new THREE.HemisphereLight(0x8a5fff, 0x2a1050, 1.8); scene.add(hemi);
-const ambient = new THREE.AmbientLight(0xb84bff, .55); scene.add(ambient);
-const sun = new THREE.DirectionalLight(0xff8fe0, 1.6);
+const hemi = new THREE.HemisphereLight(0x8a5fff, 0x2a1050, 1.2); scene.add(hemi);
+const ambient = new THREE.AmbientLight(0xb84bff, .38); scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xff8fe0, 1.2);
 sun.position.set(-140, 160, 90); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.left = sun.shadow.camera.bottom = -180; sun.shadow.camera.right = sun.shadow.camera.top = 180; sun.shadow.camera.far = 600;
