@@ -79,6 +79,29 @@ export function buildCarVisual(root, assetIndex, tintColor, carAssets) {
   return { model, wheels, groundLift, sirenLights, box };
 }
 
+// Flags a car to flash briefly -- the visual indicator for "this is the car
+// that just got hit," since a HUD number going down doesn't say WHICH car
+// was involved when there might be several nearby. Caches each mesh
+// material's original emissive once per car (materials are per-car
+// instances already, via cloneTint, so this never bleeds into other cars)
+// and drives the flash from placeCarVisual each frame -- no extra per-frame
+// work for cars that were never hit.
+export function triggerHitFlash(car, color = 0xff3b3b, duration = .28) {
+  if (!car._hitFlashMats) {
+    car._hitFlashMats = [];
+    car.model.traverse(o => {
+      if (!o.isMesh) return;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+        if (m.emissive) car._hitFlashMats.push({ mat: m, origEmissive: m.emissive.clone(), origIntensity: m.emissiveIntensity ?? 0 });
+      }
+    });
+  }
+  car._hitFlashColor = car._hitFlashColor || new THREE.Color();
+  car._hitFlashColor.set(color);
+  car._hitFlashDuration = duration;
+  car._hitFlashTimer = duration;
+}
+
 // Places a car's 3D root from its physics state each frame: position, body
 // roll/pitch smoothing, wheel spin/steer, and (for police models) siren
 // flashing. Port of index.html:620-633 (placeCar). `car` needs: root, wheels,
@@ -108,5 +131,14 @@ export function placeCarVisual(car, dt, raceTime) {
     blueMat.color.setHex(on ? 0x111133 : 0x2050ff);
     redLight.intensity = on ? 3 : 0;
     blueLight.intensity = on ? 0 : 3;
+  }
+
+  if (car._hitFlashTimer > 0) {
+    car._hitFlashTimer = Math.max(0, car._hitFlashTimer - dt);
+    const t = car._hitFlashTimer / car._hitFlashDuration; // 1 (just hit) -> 0 (fully faded)
+    for (const { mat, origEmissive, origIntensity } of car._hitFlashMats) {
+      mat.emissive.copy(origEmissive).lerp(car._hitFlashColor, t);
+      mat.emissiveIntensity = origIntensity + (1 - origIntensity) * t;
+    }
   }
 }

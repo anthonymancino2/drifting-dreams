@@ -8,6 +8,7 @@ import { GAME_CONFIG } from './config.js';
 import { loadCarAssets } from './vehicles/AssetLoader.js';
 import { VEHICLES } from './vehicles/VehicleRegistry.js';
 import { getCarThumbnail } from './vehicles/CarThumbnail.js';
+import { triggerHitFlash } from './vehicles/CarVisual.js';
 import { FreewayRing } from './road/FreewayRing.js';
 import { applyEnvironment, buildRoadSurface, buildScenery, makeSkyTexture, THEME_PALETTES } from './road/roadThemes.js';
 import { PlayerVehicle } from './player/PlayerVehicle.js';
@@ -314,7 +315,7 @@ function tick() {
     trafficManager.update(gdt, player.arc, raceTime);
     opposingTraffic.update(gdt, player.arc, raceTime);
     checkPlayerTrafficCollisions(player, trafficManager, ring, GAME_CONFIG,
-      () => raceManager.registerTrafficHit(),
+      (car) => { raceManager.registerTrafficHit(); triggerHitFlash(car); },
       () => {
         raceManager.registerCloseCall();
         cameraManager.kick(GAME_CONFIG.collision.closeCall.fovKick);
