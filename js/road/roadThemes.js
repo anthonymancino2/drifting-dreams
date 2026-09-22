@@ -14,11 +14,11 @@ export const THEME_PALETTES = {
   us101: {
     sky: ['#05030f', '#170b3a', '#4a1568', '#c22fb0', '#ff7fd6'],
     fog: 0x2a1148, fogDensity: .00016,
-    ground: 0x0d0620, shoulder: 0x1c1030, road: 0x140d24,
+    ground: 0x1c1030, shoulder: 0x322450, road: 0x281e3c,
     curbA: 0xd93fc0, curbB: 0x2fb8c4, curbEmissive: .12,
-    hemiSky: 0x8a5fff, hemiGround: 0x2a1050, hemiIntensity: 1.2,
-    ambient: 0xb84bff, ambientIntensity: .38,
-    sunColor: 0xff8fe0, sunIntensity: 1.2, sunPos: [-140, 160, 90],
+    hemiSky: 0x9a7fff, hemiGround: 0x3a1868, hemiIntensity: 2.0,
+    ambient: 0xc86bff, ambientIntensity: .7,
+    sunColor: 0xff9fe6, sunIntensity: 1.8, sunPos: [-140, 160, 90],
     sunBallColor: 0xff2fd0, sunBallPos: [-200, 90, -480],
     retroVisible: true
   }
@@ -179,6 +179,34 @@ function makeHill(radius, height, seed) {
   return cone;
 }
 
+// Cyberpunk city skyline building, port of index.html:382-383's makeBuilding
+// -- a boxy tower with a glowing neon rooftop cap and a few lit window
+// panes per face. Windows/cap use MeshBasicMaterial at partial opacity
+// (unlit, but soft, scattered small panes rather than one continuous strip)
+// so the skyline reads as a lit-up city at a distance without the harsh
+// continuous-glow strips that made the road itself hard to look at.
+const CITY_BODY_COLORS = [0x1a1330, 0x211a3d, 0x150f28, 0x241c40, 0x1c1440];
+const CITY_NEON_COLORS = [0x24f5ef, 0xff2fd0, 0xa64bff, 0xffd31d, 0xff8a3d];
+function makeNeonCityBuilding(width, height, depth, seed) {
+  const g = new THREE.Group();
+  const bodyColor = CITY_BODY_COLORS[seed % CITY_BODY_COLORS.length];
+  const neonColor = CITY_NEON_COLORS[(seed * 3 + 1) % CITY_NEON_COLORS.length];
+  const body = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), new THREE.MeshStandardMaterial({ color: bodyColor, roughness: .85, metalness: .2 }));
+  body.position.y = height / 2; body.castShadow = true; body.receiveShadow = true; g.add(body);
+  const capH = 1.1 + height * .02;
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(width * 1.04, capH, depth * 1.04), new THREE.MeshBasicMaterial({ color: neonColor }));
+  cap.position.y = height + capH / 2; g.add(cap);
+  const winMat = new THREE.MeshBasicMaterial({ color: neonColor, transparent: true, opacity: .55, side: THREE.DoubleSide });
+  const rows = Math.max(2, Math.floor(height / 10));
+  for (let r = 0; r < rows; r++) {
+    if ((seed * 7 + r * 13) % 10 < 3) continue;
+    const wy = 5 + r * (height - 9) / Math.max(1, rows - 1);
+    const winF = new THREE.Mesh(new THREE.PlaneGeometry(width * .62, .6), winMat); winF.position.set(0, wy, depth / 2 + .03); g.add(winF);
+    const winB = new THREE.Mesh(new THREE.PlaneGeometry(width * .62, .6), winMat); winB.position.set(0, wy, -depth / 2 - .03); winB.rotation.y = Math.PI; g.add(winB);
+  }
+  return g;
+}
+
 // Freeway scenery: reuses the guardrail/post loop already built for every
 // theme by buildRoadSurface, adds sound-wall segments and sparse natural
 // trees (much sparser than the old sakura theme's density) plus a flat, wide,
@@ -218,11 +246,24 @@ export function buildScenery(theme, ring, groups, assets) {
     roadBuildings.add(t);
   }
 
-  const hillCount = 36;
+  // Lit cyberpunk city skyline, near ring -- this is the primary background
+  // element per the requested vibe, not an afterthought.
+  const cityCount = 56;
+  for (let i = 0; i < cityCount; i++) {
+    const a = i / cityCount * Math.PI * 2 + (i * .37 % 1) * .06;
+    const radius = skylineRadius + (i * 29 % 90);
+    const width = 16 + (i * 13 % 24), depth = 16 + (i * 7 % 20), height = 55 + (i * 41 % 170);
+    const b = makeNeonCityBuilding(width, height, depth, i);
+    b.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
+    b.rotation.y = i;
+    skyline.add(b);
+  }
+  // Distant mountain silhouette, further ring behind the city, for depth.
+  const hillCount = 24;
   for (let i = 0; i < hillCount; i++) {
     const a = i / hillCount * Math.PI * 2 + (i * .37 % 1) * .08;
-    const radius = skylineRadius + (i * 41 % 160);
-    const hill = makeHill(280 + (i * 53 % 260), 90 + (i * 37 % 140), i);
+    const radius = skylineRadius + 700 + (i * 41 % 300);
+    const hill = makeHill(280 + (i * 53 % 260), 110 + (i * 37 % 170), i);
     hill.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
     skyline.add(hill);
   }
