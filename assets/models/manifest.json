@@ -1,0 +1,102 @@
+{
+  "cars": [
+    {
+      "index": 0,
+      "name": "Apex GT",
+      "file": "assets/models/car-00-apex-gt.glb"
+    },
+    {
+      "index": 1,
+      "name": "Velocity S2",
+      "file": "assets/models/car-01-velocity-s2.glb"
+    },
+    {
+      "index": 2,
+      "name": "Interceptor",
+      "file": "assets/models/car-02-interceptor.glb"
+    },
+    {
+      "index": 3,
+      "name": "City Cab",
+      "file": "assets/models/car-03-city-cab.glb"
+    },
+    {
+      "index": 4,
+      "name": "Trailblazer",
+      "file": "assets/models/car-04-trailblazer.glb"
+    },
+    {
+      "index": 5,
+      "name": "Commuter",
+      "file": "assets/models/car-05-commuter.glb"
+    },
+    {
+      "index": 6,
+      "name": "Sedan LX",
+      "file": "assets/models/car-06-sedan-lx.glb"
+    },
+    {
+      "index": 7,
+      "name": "Nemesis GT",
+      "file": "assets/models/car-07-nemesis-gt.glb"
+    },
+    {
+      "index": 8,
+      "name": "Scarlet GT",
+      "file": "assets/models/car-08-scarlet-gt.glb"
+    },
+    {
+      "index": 9,
+      "name": "Super V12",
+      "file": "assets/models/car-09-super-v12.glb"
+    },
+    {
+      "index": 10,
+      "name": "Onyx Supercar",
+      "file": "assets/models/car-10-onyx-supercar.glb"
+    },
+    {
+      "index": 11,
+      "name": "Street Coupe",
+      "file": "assets/models/car-11-street-coupe.glb"
+    },
+    {
+      "index": 12,
+      "name": "Muscle 6.2",
+      "file": "assets/models/car-12-muscle-6-2.glb"
+    },
+    {
+      "index": 13,
+      "name": "Rally Cross",
+      "file": "assets/models/car-13-rally-cross.glb"
+    },
+    {
+      "index": 14,
+      "name": "Armor Unit",
+      "file": "assets/models/car-14-armor-unit.glb"
+    },
+    {
+      "index": 15,
+      "name": "Trail Runner",
+      "file": "assets/models/car-15-trail-runner.glb"
+    },
+    {
+      "index": 16,
+      "name": "Police Cruiser",
+      "file": "assets/models/car-16-police-cruiser.glb"
+    },
+    {
+      "index": 17,
+      "name": "City Runner",
+      "file": "assets/models/car-17-city-runner.glb"
+    },
+    {
+      "index": 18,
+      "name": "Cargo Van",
+      "file": "assets/models/car-18-cargo-van.glb"
+    }
+  ],
+  "tree": "assets/models/tree.glb",
+  "rock": "assets/models/rock.glb",
+  "bush": "assets/models/bush.glb"
+}
