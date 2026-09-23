@@ -3,8 +3,8 @@
 export const GAME_CONFIG = {
   road: {
     laneCount: 4,
-    laneWidth: 3.0,             // exact fit for the modular kit's 12-unit-wide paved tile (4 * 3.0 = 12.0, flush with the tile edge)
-    shoulderWidth: 3,
+    laneWidth: 6.0,             // exact fit for the modular kit's tile at TileCatalog's TILE_SCALE=2 (4 * 6.0 = 24.0, flush with the tile edge)
+    shoulderWidth: 6,
     sampleGap: 5.4,
     speedLimitMph: 65,
     // Tuning for the branching tile network (RoadNetwork/RoadNode) -- see
@@ -50,10 +50,11 @@ export const GAME_CONFIG = {
     minFollowGap: 6,
     timeHeadwaySec: 1.1,
     cruiseSpeedMphRange: [45, 68],
-    // Bumped from 28 -- with acceleration slowed down, the road needs
-    // consistently more to react to, not just brief flashes of traffic
-    // between long empty stretches.
-    pool: { maxActive: 36, spawnAheadDist: 260, despawnBehindDist: 80 },
+    // Bumped again (36 -> 90) for the ~5x-longer modular track -- pool size
+    // needs to scale with track length or density (and the "where did the
+    // traffic go" feeling) drops proportionally; keeps roughly the same
+    // spacing-between-cars as before on the bigger loop.
+    pool: { maxActive: 90, spawnAheadDist: 320, despawnBehindDist: 100 },
     assetPool: [3, 4, 5, 6, 18],   // City Cab / Trailblazer / Commuter / Sedan LX + Cargo Van(18) as box-truck placeholder
     seed: 1337
   },
@@ -68,7 +69,11 @@ export const GAME_CONFIG = {
     trafficHitScorePenalty: 1,
     trafficHitBadRep: 1,
     hitCooldownSec: .5,
-    shoulderSpeedPenaltyPerSec: 2,
+    // Bumped from 2 -- paired with PlayerVehicle's harder edge-of-shoulder
+    // clamp (kills outward velocity on contact, not just a gentle push
+    // back), so running off-road now actually costs real speed and reads
+    // as hitting a boundary, not gliding past an invisible line.
+    shoulderSpeedPenaltyPerSec: 10,
     // Close call: passing a car within this band WITHOUT hitting it (wider
     // than the hit gaps above, still tight -- comfortably under half a lane
     // width so it never fires for a car just cruising in the next lane

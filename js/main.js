@@ -13,7 +13,7 @@ import { RoadNetwork } from './road/RoadNetwork.js';
 import { ROAD_LAYOUT } from './road/RoadLayout.js';
 import { TILE_CATALOG } from './road/TileCatalog.js';
 import { loadRoadTileAssets, loadPropAssets } from './road/TileAssetLoader.js';
-import { buildTileRoad, scatterProps } from './road/TileRoadBuilder.js';
+import { buildTileRoad, scatterProps, buildGuardrails } from './road/TileRoadBuilder.js';
 import { applyEnvironment, buildScenery, makeSkyTexture, THEME_PALETTES } from './road/roadThemes.js';
 import { mulberry32 } from './core/MathUtils.js';
 import { PlayerVehicle } from './player/PlayerVehicle.js';
@@ -143,6 +143,7 @@ async function boot() {
   applyEnvironment('us101', { scene, hemi, ambient, sun, sunBall, retroDecor });
   buildScenery('us101', network, { roadBuildings, skyline }, ground);
   buildTileRoad(network, TILE_CATALOG, roadTileAssets, roadGroup);
+  buildGuardrails(network, roadGroup);
   scatterProps(network, propAssets, roadGroup, mulberry32(GAME_CONFIG.traffic.seed ^ 0x5eed));
 
   player = new PlayerVehicle(scene, carAssets, VEHICLES[vehiclePickIndex].assetIndex);

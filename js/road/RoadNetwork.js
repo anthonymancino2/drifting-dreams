@@ -140,13 +140,17 @@ export class RoadNetwork {
 
   _walk(program, catalog, ctx, isPrimary) {
     for (const step of program) {
-      if (step.cmd === 'straight' || step.cmd === 'curve90') {
-        const def = catalog[step.cmd];
+      const def = catalog[step.cmd];
+      // Any single-in/single-out tile (straight, curve90, curve90L, and any
+      // future addition) is handled generically here by whether it carries
+      // an `arc` def -- only 'split'/'merge' (multi-socket junction tiles)
+      // need bespoke handling below.
+      if (def && def.sockets.out.length === 1 && !Array.isArray(def.sockets.in)) {
         for (let i = 0; i < (step.count ?? 1); i++) {
           const placed = resolvePlacement(def, ctx.pos, ctx.heading, def.sockets.in);
           ctx.tiles.push({ typeId: step.cmd, anchor: placed.anchor, deg: placed.deg });
-          if (step.cmd === 'straight') emitStraightSamples(ctx.samples, placed.anchor, placed.deg, def.sockets.in.local, def.sockets.out[0].local, this.cfg.sampleGap);
-          else emitArcSamples(ctx.samples, placed.anchor, placed.deg, def.arc, this.cfg.sampleGap);
+          if (def.arc) emitArcSamples(ctx.samples, placed.anchor, placed.deg, def.arc, this.cfg.sampleGap);
+          else emitStraightSamples(ctx.samples, placed.anchor, placed.deg, def.sockets.in.local, def.sockets.out[0].local, this.cfg.sampleGap);
           ctx.pos = placed.outs[0].pos; ctx.heading = placed.outs[0].dir;
         }
       } else if (step.cmd === 'split') {

@@ -169,23 +169,40 @@ export class PlayerVehicle {
     this._sampleHint = info.index;
     this.arc = info.arc;
     this.primaryArc = network.primaryArcFor(this.edgeId, this.arc);
-    this.lateral = info.lateral;
     this.position.y = lerp(this.position.y, info.y, 1 - Math.exp(-dt * 22));
 
+    // A real boundary, not an invisible line the car can glide through:
+    // reproject position back to the edge (as before), but ALSO kill the
+    // component of velocity still pointing further out-of-bounds. Without
+    // that second part, `speed` keeps building every frame gas is held and
+    // the reprojection alone only ever undoes ONE frame's worth of outward
+    // drift -- which reads as "the road isn't really there" even though
+    // position is technically being clamped, because the car just keeps
+    // sliding along past the boundary under its own momentum.
     const absLat = Math.abs(info.lateral);
     let hitShoulder = false;
     if (absLat > edge.halfWidth) {
       hitShoulder = true;
-      this.speed -= config.collision.shoulderSpeedPenaltyPerSec * dt;
       const dir = Math.sign(info.lateral), s = edge.samples[info.index];
       const dx = this.position.x - s.p.x, dz = this.position.z - s.p.z, along = dx * info.tangent.x + dz * info.tangent.z;
       this.position.x = s.p.x + info.tangent.x * along + info.side.x * edge.halfWidth * dir;
       this.position.z = s.p.z + info.tangent.z * along + info.side.z * edge.halfWidth * dir;
+      info.lateral = edge.halfWidth * dir;
+
+      const velX = Math.sin(this.moveHeading) * this.speed, velZ = Math.cos(this.moveHeading) * this.speed;
+      const outwardSpeed = (velX * info.side.x + velZ * info.side.z) * dir; // positive = still driving further out of bounds
+      if (outwardSpeed > 0) {
+        const tangentSpeed = velX * info.tangent.x + velZ * info.tangent.z;
+        this.speed = tangentSpeed; // scrapes along the boundary instead of continuing to push through it
+        this.moveHeading = Math.atan2(info.tangent.x, info.tangent.z);
+      }
+      this.speed -= config.collision.shoulderSpeedPenaltyPerSec * dt;
       const trackHeading = Math.atan2(info.tangent.x, info.tangent.z);
       this.moveHeading = angDamp(this.moveHeading, trackHeading, 5, dt);
       this._driftActive = false;
       this._shoulderRecoverTimer = .3;
     }
+    this.lateral = info.lateral;
     if (this._shoulderRecoverTimer > 0) this._shoulderRecoverTimer = Math.max(0, this._shoulderRecoverTimer - dt);
 
     if (effects) {

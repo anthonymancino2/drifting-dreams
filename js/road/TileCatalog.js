@@ -13,49 +13,80 @@
 // (the direction you're heading as you cross it), same sense for `in` and
 // `out` -- NOT an outward-facing normal. For a straight tile this means
 // in.dir === out.dir (no direction change); for a turn they differ.
-
-export const CELL_SIZE = 12;
+//
+// TILE_SCALE: the raw .glb tiles are modeled at a 12-unit cell, giving a
+// 12-unit-wide paved road -- too narrow for the "wider track" the game
+// wants. Rather than non-uniformly stretching tile meshes (which would
+// distort the curve tiles' circular arcs, breaking the closed-form sample
+// math below), every socket/cell/arc coordinate is scaled up by this factor
+// UNIFORMLY, and TileRoadBuilder applies the same factor as a uniform mesh
+// scale -- geometry and visuals stay consistent, curves stay circular (just
+// bigger-radius, which also makes them easier to hold a drift through at
+// speed instead of demanding a near-stop for a tight radius-18 turn).
+export const TILE_SCALE = 2;
+export const CELL_SIZE = 12 * TILE_SCALE;
 
 export const TILE_CATALOG = {
   straight: {
     file: 'Road1', cells: { x: 1, z: 1 },
     sockets: {
-      in: { local: [0, -6], dir: [0, 1] },
-      out: [{ local: [0, 6], dir: [0, 1] }]
+      in: { local: [0, -6 * TILE_SCALE], dir: [0, 1] },
+      out: [{ local: [0, 6 * TILE_SCALE], dir: [0, 1] }]
     }
   },
   // The only clean, symmetric quarter-turn in the pack (Curve1/2 are
   // irregular, Curve4 is a large 4x4 stretch-goal). Bbox X:[-6,18] Z:[-6,18]
-  // -- consistent with a near cell centered at local origin (0,0) and a far
-  // cell centered at local (12,12), i.e. a "north-in, east-out" right turn:
-  // enters heading +Z on the near cell's south edge, sweeps through the
-  // diagonal quadrant, exits heading +X on the far cell's east edge.
-  // VERIFIED empirically: chained after 2 straights, the curve continues
-  // with zero gap/overlap at rotation 0.
+  // (pre-scale) -- consistent with a near cell centered at local origin
+  // (0,0) and a far cell centered at local (12,12), i.e. a "north-in,
+  // east-out" right turn: enters heading +Z on the near cell's south edge,
+  // sweeps through the diagonal quadrant, exits heading +X on the far
+  // cell's east edge. VERIFIED empirically: chained after 2 straights, the
+  // curve continues with zero gap/overlap at rotation 0.
   curve90: {
     file: 'Road1_Curve3', cells: { x: 2, z: 2 },
     sockets: {
-      in: { local: [0, -6], dir: [0, 1] },
-      out: [{ local: [18, 12], dir: [1, 0] }]
+      in: { local: [0, -6 * TILE_SCALE], dir: [0, 1] },
+      out: [{ local: [18 * TILE_SCALE, 12 * TILE_SCALE], dir: [1, 0] }]
     },
     // Closed-form arc description used by RoadEdge sample generation --
     // center of curvature + radius + start/sweep angle. Derived so the
     // radius is perpendicular to the tangent at BOTH sockets: the only
     // circle consistent with in=(0,-6) tangent (0,1) and out=(18,12)
-    // tangent (1,0) is centered at (18,-6) with radius 18 (checked: distance
-    // from that center to both socket points is exactly 18).
-    arc: { center: [18, -6], radius: 18, startAngleDeg: 180, sweepDeg: -90 }
+    // tangent (1,0) is centered at (18,-6) with radius 18 (pre-scale;
+    // checked: distance from that center to both socket points is exactly
+    // 18), scaled by TILE_SCALE like everything else here.
+    arc: { center: [18 * TILE_SCALE, -6 * TILE_SCALE], radius: 18 * TILE_SCALE, startAngleDeg: 180, sweepDeg: -90 }
   },
-  // Symmetric 3-way fork: one 12-wide entry, opens to a 24-wide far edge
-  // carrying two diverging lanes side by side. VERIFIED empirically: a
-  // lead-in straight connects flush into its entry at rotation 0.
+  // Mirror image of curve90 (same mesh, `mirror:true` tells TileRoadBuilder
+  // to flip it with a negative-X scale) -- a LEFT-handed turn where curve90
+  // is right-handed, needed for real S-curves/chicanes instead of a track
+  // that only ever turns one way. Derived by mirroring curve90's geometry
+  // across its own local Z axis (negate every X coordinate): a socket
+  // position's X negates, a socket direction's X negates, and the arc's
+  // center X negates with its radius unchanged. The sweep itself reverses
+  // orientation under an X-mirror -- solving (cosθ,sinθ) -> (-cosθ,sinθ) for
+  // θ(t)=startAngleDeg+sweepDeg*t gives mirroredθ(t) = (180-startAngleDeg) +
+  // (-sweepDeg)*t, i.e. startAngleDeg'=180-180=0, sweepDeg'=-(-90)=90.
+  // Verified algebraically against both mirrored socket points (both land
+  // exactly on the circle at t=0 and t=1).
+  curve90L: {
+    file: 'Road1_Curve3', mirror: true, cells: { x: 2, z: 2 },
+    sockets: {
+      in: { local: [0, -6 * TILE_SCALE], dir: [0, 1] },
+      out: [{ local: [-18 * TILE_SCALE, 12 * TILE_SCALE], dir: [-1, 0] }]
+    },
+    arc: { center: [-18 * TILE_SCALE, -6 * TILE_SCALE], radius: 18 * TILE_SCALE, startAngleDeg: 0, sweepDeg: 90 }
+  },
+  // Symmetric 3-way fork: one entry, opens to a far edge carrying two
+  // diverging lanes side by side. VERIFIED empirically: a lead-in straight
+  // connects flush into its entry at rotation 0.
   ySplit: {
     file: 'Road11_Y_Splitter', cells: { x: 2, z: 2 },
     sockets: {
-      in: { local: [0, -6], dir: [0, 1] },
+      in: { local: [0, -6 * TILE_SCALE], dir: [0, 1] },
       out: [
-        { local: [-6, 18], dir: [0, 1] }, // left branch
-        { local: [6, 18], dir: [0, 1] }   // right branch
+        { local: [-6 * TILE_SCALE, 18 * TILE_SCALE], dir: [0, 1] }, // left branch
+        { local: [6 * TILE_SCALE, 18 * TILE_SCALE], dir: [0, 1] }   // right branch
       ]
     }
   },
@@ -70,10 +101,10 @@ export const TILE_CATALOG = {
     file: 'Road11_Y_Splitter', cells: { x: 2, z: 2 },
     sockets: {
       in: [
-        { local: [-6, 18], dir: [0, -1] },
-        { local: [6, 18], dir: [0, -1] }
+        { local: [-6 * TILE_SCALE, 18 * TILE_SCALE], dir: [0, -1] },
+        { local: [6 * TILE_SCALE, 18 * TILE_SCALE], dir: [0, -1] }
       ],
-      out: [{ local: [0, -6], dir: [0, -1] }]
+      out: [{ local: [0, -6 * TILE_SCALE], dir: [0, -1] }]
     }
   }
 };
