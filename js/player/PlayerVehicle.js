@@ -29,7 +29,9 @@ export class PlayerVehicle {
     this.steer = 0;
     this.yawRate = 0;
     this.nitro = 1;
+    this.edgeId = null; // set by the caller (main.js resetRace) before first update
     this.arc = 0;
+    this.primaryArc = 0;
     this.lateral = 0;
     this._sampleHint = null;
     this._shoulderRecoverTimer = 0;
@@ -70,7 +72,7 @@ export class PlayerVehicle {
     });
   }
 
-  update(dt, input, ring, config, effects) {
+  update(dt, input, network, config, effects) {
     const pc = config.player;
     const sm = this.statMods;
 
@@ -144,21 +146,41 @@ export class PlayerVehicle {
     this.position.x += Math.sin(this.moveHeading) * this.speed * dt;
     this.position.z += Math.cos(this.moveHeading) * this.speed * dt;
 
-    const info = ring.nearestSample(this.position, this._sampleHint);
+    let edge = network.getEdge(this.edgeId);
+    let info = edge.nearestSample(this.position, this._sampleHint);
+    // Walked off this edge's end -- either just continue onto the single
+    // next edge, or (at a split) resolve the branch from which half of the
+    // lanes the player is currently in. Re-resolve nearestSample from
+    // scratch (hint=null) on the new edge since the old hint/index means
+    // nothing there.
+    if (info.offEnd) {
+      const { nextIds, node } = network.edgeTransitionOptions(this.edgeId);
+      let nextId = nextIds[0];
+      if (nextIds.length > 1 && node) {
+        const laneIndex = edge.laneIndexFromLateral(info.lateral);
+        nextId = node.chooseOutgoingEdge(laneIndex, config.road.laneCount);
+      }
+      if (nextId) {
+        this.edgeId = nextId;
+        edge = network.getEdge(this.edgeId);
+        info = edge.nearestSample(this.position, null);
+      }
+    }
     this._sampleHint = info.index;
     this.arc = info.arc;
+    this.primaryArc = network.primaryArcFor(this.edgeId, this.arc);
     this.lateral = info.lateral;
     this.position.y = lerp(this.position.y, info.y, 1 - Math.exp(-dt * 22));
 
     const absLat = Math.abs(info.lateral);
     let hitShoulder = false;
-    if (absLat > ring.halfWidth) {
+    if (absLat > edge.halfWidth) {
       hitShoulder = true;
       this.speed -= config.collision.shoulderSpeedPenaltyPerSec * dt;
-      const dir = Math.sign(info.lateral), s = ring.samples[info.index];
+      const dir = Math.sign(info.lateral), s = edge.samples[info.index];
       const dx = this.position.x - s.p.x, dz = this.position.z - s.p.z, along = dx * info.tangent.x + dz * info.tangent.z;
-      this.position.x = s.p.x + info.tangent.x * along + info.side.x * ring.halfWidth * dir;
-      this.position.z = s.p.z + info.tangent.z * along + info.side.z * ring.halfWidth * dir;
+      this.position.x = s.p.x + info.tangent.x * along + info.side.x * edge.halfWidth * dir;
+      this.position.z = s.p.z + info.tangent.z * along + info.side.z * edge.halfWidth * dir;
       const trackHeading = Math.atan2(info.tangent.x, info.tangent.z);
       this.moveHeading = angDamp(this.moveHeading, trackHeading, 5, dt);
       this._driftActive = false;

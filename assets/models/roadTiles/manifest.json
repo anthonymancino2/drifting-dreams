@@ -1,0 +1,15 @@
+{
+  "Road1": "assets/models/roadTiles/Road1.glb",
+  "Road1_Curve1": "assets/models/roadTiles/Road1_Curve1.glb",
+  "Road1_Curve2": "assets/models/roadTiles/Road1_Curve2.glb",
+  "Road1_Curve3": "assets/models/roadTiles/Road1_Curve3.glb",
+  "Road1_Curve4": "assets/models/roadTiles/Road1_Curve4.glb",
+  "Road2_T": "assets/models/roadTiles/Road2_T.glb",
+  "Road2_X": "assets/models/roadTiles/Road2_X.glb",
+  "Road6_End": "assets/models/roadTiles/Road6_End.glb",
+  "Road10_90angle_Corner": "assets/models/roadTiles/Road10_90angle_Corner.glb",
+  "Road11_Y_Splitter": "assets/models/roadTiles/Road11_Y_Splitter.glb",
+  "Road11_Y_Splitter_45": "assets/models/roadTiles/Road11_Y_Splitter_45.glb",
+  "Road12_Diagonal_Splitter_L": "assets/models/roadTiles/Road12_Diagonal_Splitter_L.glb",
+  "Road12_Diagonal_Splitter_R": "assets/models/roadTiles/Road12_Diagonal_Splitter_R.glb"
+}

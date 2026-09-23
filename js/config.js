@@ -3,11 +3,21 @@
 export const GAME_CONFIG = {
   road: {
     laneCount: 4,
-    laneWidth: 4.1,             // matches the old game's traffic lateral slot spacing
+    laneWidth: 3.0,             // exact fit for the modular kit's 12-unit-wide paved tile (4 * 3.0 = 12.0, flush with the tile edge)
     shoulderWidth: 3,
     sampleGap: 5.4,
-    ring: { radiusX: 1400, radiusZ: 1150, waves: 6, amp: 70, numPoints: 260, elevAmp: 5 }, // starting guess, expect by-feel iteration
-    speedLimitMph: 65
+    speedLimitMph: 65,
+    // Tuning for the branching tile network (RoadNetwork/RoadNode) -- see
+    // js/road/RoadNetwork.js and RoadLayout.js for the graph itself.
+    network: {
+      decisionWindow: 45,     // meters from a 2-way node's end at which an uncommitted traffic car rolls its branch choice
+      // Indexed to match RoadNode.outgoingEdges order, which is [shortcut, bypass]
+      // (left/right physical sockets) for this layout -- shortcut gets the larger
+      // share (0.65) so it actually lives up to its "heavier traffic" billing.
+      branchWeights: [0.65, 0.35], // [shortcut, bypass]
+      signDistance: 90,       // meters out that the HUD's junction sign starts showing
+      nodeTransitionWindow: 15 // meters within a shared node where collision/checkpoint checks must consider adjacent edges
+    }
   },
   player: {
     // Cut ~33%/31% from the old values -- not a top-speed cap (topMph per

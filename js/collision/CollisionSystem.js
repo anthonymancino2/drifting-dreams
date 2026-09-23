@@ -27,9 +27,10 @@
 // crash." Debounced per car, same pattern as the hit cooldown, and
 // explicitly skipped on a frame that already registered a hit so one
 // contact can't also fire a close-call bonus.
-export function checkPlayerTrafficCollisions(player, trafficManager, ring, config, onHit, onCloseCall) {
+export function checkPlayerTrafficCollisions(player, trafficManager, network, config, onHit, onCloseCall) {
   const cfg = config.collision;
-  const playerInfo = ring.nearestSample(player.position, player._sampleHint);
+  const playerEdge = network.getEdge(player.edgeId);
+  const playerInfo = playerEdge.nearestSample(player.position, player._sampleHint);
 
   for (const car of trafficManager.activeCars) {
     const dx = car.position.x - player.position.x, dz = car.position.z - player.position.z;

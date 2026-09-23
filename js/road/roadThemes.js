@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { cloneTint } from '../core/GltfUtils.js';
 
 // Gap between the main carriageway's shoulder and the opposing carriageway's
 // shoulder -- shared with OpposingTraffic.js so the visual road and the cars
@@ -52,163 +51,6 @@ export function applyEnvironment(theme, env) {
   env.retroDecor.visible = pal.retroVisible;
 }
 
-// centerOffset shifts the whole strip sideways from the ring's own
-// centerline -- used to build the opposing carriageway as a second strip
-// running parallel to the main one, on the same underlying curve.
-function ribbon(ring, scene, halfWidth, yOffset, material, segments = 720, centerOffset = 0) {
-  const pos = [], uv = [], idx = [];
-  const vA = new THREE.Vector3();
-  for (let i = 0; i <= segments; i++) {
-    const u = i / segments, { p, side } = ring.frame(u);
-    for (const x of [-1, 1]) {
-      vA.copy(p).addScaledVector(side, centerOffset + halfWidth * x); vA.y += yOffset;
-      pos.push(vA.x, vA.y, vA.z); uv.push((x + 1) / 2, u * 65);
-    }
-  }
-  for (let i = 0; i < segments; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.setIndex(idx); g.computeVertexNormals();
-  const m = new THREE.Mesh(g, material); m.receiveShadow = true; scene.add(m);
-  return m;
-}
-
-// Road surface: same ribbon/curb/guardrail technique as the old
-// buildRoadSurface (index.html:345-368), generalized to discrete lanes --
-// dashed markers sit at every INTERNAL lane boundary instead of two fixed
-// offsets, and the two outer edges get solid edge lines instead of racing curbs.
-export function buildRoadSurface(theme, ring, roadGroup, scene, ground) {
-  roadGroup.clear();
-  const pal = THEME_PALETTES[theme];
-  ground.material.color.setHex(pal.ground);
-  const groundRadius = Math.max(...ring.points.map(p => Math.hypot(p.x, p.z))) + 600;
-  if (ground.geometry.parameters.radius !== groundRadius) { ground.geometry.dispose(); ground.geometry = new THREE.CircleGeometry(groundRadius, 96); }
-
-  const roadHalf = ring.roadHalfWidth;
-  roadGroup.add(ribbon(ring, scene, ring.halfWidth, -.18, new THREE.MeshStandardMaterial({ color: pal.shoulder, roughness: .85, side: THREE.DoubleSide })));
-  roadGroup.add(ribbon(ring, scene, roadHalf, 0, new THREE.MeshStandardMaterial({ color: pal.road, roughness: .7, metalness: .15, side: THREE.DoubleSide })));
-
-  // Plain reflective lane paint, not a light source -- a small emissive kick
-  // (not a full neon glow) is enough to read as "lit road markings at night"
-  // without turning the lanes into strobing light bars.
-  const dashGeo = new THREE.BoxGeometry(.22, .045, 3.6);
-  const dashMat = new THREE.MeshStandardMaterial({ color: 0xd8e6ea, emissive: 0x6fb8c2, emissiveIntensity: .25 });
-  const dashCount = Math.max(60, Math.round(ring.length / 12));
-  const laneBoundaryOffsets = [];
-  for (let i = 1; i < ring.cfg.laneCount; i++) laneBoundaryOffsets.push(-roadHalf + ring.cfg.laneWidth * i);
-  const dashes = new THREE.InstancedMesh(dashGeo, dashMat, dashCount * Math.max(1, laneBoundaryOffsets.length));
-  const dummy = new THREE.Object3D(); let di = 0;
-  for (let i = 0; i < dashCount; i++) {
-    const u = i / dashCount, { p, t, side } = ring.frame(u), yaw = Math.atan2(t.x, t.z);
-    for (const lane of laneBoundaryOffsets) {
-      dummy.position.copy(p).addScaledVector(side, lane); dummy.position.y += .09;
-      dummy.rotation.set(0, yaw, 0); dummy.updateMatrix(); dashes.setMatrixAt(di++, dummy.matrix);
-    }
-  }
-  dashes.count = di;
-  dashes.receiveShadow = true; roadGroup.add(dashes);
-
-  const curbGeo = new THREE.BoxGeometry(1.7, .24, 3);
-  const curbMats = [
-    new THREE.MeshStandardMaterial({ color: pal.curbA, emissive: pal.curbA, emissiveIntensity: pal.curbEmissive }),
-    new THREE.MeshStandardMaterial({ color: pal.curbB, emissive: pal.curbB, emissiveIntensity: pal.curbEmissive })
-  ];
-  const curbCount = Math.max(60, Math.round(ring.length / 22));
-  for (let i = 0; i < curbCount; i++) {
-    const u = i / curbCount, { p, t, side } = ring.frame(u), yaw = Math.atan2(t.x, t.z);
-    for (const edge of [-1, 1]) {
-      const m = new THREE.Mesh(curbGeo, curbMats[edge < 0 ? 0 : 1]);
-      m.position.copy(p).addScaledVector(side, edge * (roadHalf + .25)); m.position.y += .05; m.rotation.y = yaw;
-      m.receiveShadow = true; roadGroup.add(m);
-    }
-  }
-
-  // Low metalness/high roughness on purpose -- a shiny rail throws sharp
-  // specular glints as each post passes the camera, which bloom turns into a
-  // rapid strobe effect while driving. Matte reads as metal at night just
-  // fine without the flashing.
-  const railMat = new THREE.MeshStandardMaterial({ color: 0x8a7fb0, metalness: .2, roughness: .75 });
-  const railGeo = new THREE.BoxGeometry(.18, .2, 5.3), postGeo = new THREE.BoxGeometry(.18, 1.05, .18);
-  const railCount = Math.max(50, Math.round(ring.length / 12));
-  for (let i = 0; i < railCount; i++) {
-    const u = i / railCount, { p, t, side } = ring.frame(u), yaw = Math.atan2(t.x, t.z);
-    for (const edge of [-1, 1]) {
-      const r = new THREE.Mesh(railGeo, railMat);
-      r.position.copy(p).addScaledVector(side, edge * (ring.halfWidth + .5)); r.position.y += .78; r.rotation.y = yaw; r.castShadow = true;
-      roadGroup.add(r);
-      if (i % 2 === 0) { const post = new THREE.Mesh(postGeo, railMat); post.position.copy(r.position); post.position.y -= .42; roadGroup.add(post); }
-    }
-  }
-
-  // Opposing carriageway: a second parallel strip across the median, purely
-  // visual (OpposingTraffic.js drives the cars on it) -- reuses the same
-  // ring curve, just offset further out. The main carriageway's own +1-edge
-  // guardrail (built above) already serves as the near-side median barrier;
-  // this only needs the far-side one plus the opposing asphalt/shoulder/lane
-  // markings mirroring the main road's.
-  const oppCenter = ring.halfWidth + MEDIAN_GAP + roadHalf;
-  roadGroup.add(ribbon(ring, scene, ring.halfWidth, -.18, new THREE.MeshStandardMaterial({ color: pal.shoulder, roughness: .85, side: THREE.DoubleSide }), 720, oppCenter));
-  roadGroup.add(ribbon(ring, scene, roadHalf, 0, new THREE.MeshStandardMaterial({ color: pal.road, roughness: .7, metalness: .15, side: THREE.DoubleSide }), 720, oppCenter));
-
-  const oppLaneBoundaryOffsets = laneBoundaryOffsets.map(o => o + oppCenter);
-  const oppDashes = new THREE.InstancedMesh(dashGeo, dashMat, dashCount * Math.max(1, oppLaneBoundaryOffsets.length));
-  let odi = 0;
-  for (let i = 0; i < dashCount; i++) {
-    const u = i / dashCount, { p, t, side } = ring.frame(u), yaw = Math.atan2(t.x, t.z);
-    for (const lane of oppLaneBoundaryOffsets) {
-      dummy.position.copy(p).addScaledVector(side, lane); dummy.position.y += .09;
-      dummy.rotation.set(0, yaw, 0); dummy.updateMatrix(); oppDashes.setMatrixAt(odi++, dummy.matrix);
-    }
-  }
-  oppDashes.count = odi;
-  oppDashes.receiveShadow = true; roadGroup.add(oppDashes);
-
-  for (let i = 0; i < railCount; i++) {
-    const u = i / railCount, { p, t, side } = ring.frame(u), yaw = Math.atan2(t.x, t.z);
-    const r = new THREE.Mesh(railGeo, railMat);
-    r.position.copy(p).addScaledVector(side, oppCenter + ring.halfWidth + .5); r.position.y += .78; r.rotation.y = yaw; r.castShadow = true;
-    roadGroup.add(r);
-    if (i % 2 === 0) { const post = new THREE.Mesh(postGeo, railMat); post.position.copy(r.position); post.position.y -= .42; roadGroup.add(post); }
-  }
-}
-
-function placeClearOfRoad(ring, u, edge, baseDist, halfExtent) {
-  const bi = Math.max(0, Math.min(ring.sampleCount - 1, Math.round(((u % 1 + 1) % 1) * ring.sampleCount)));
-  const s = ring.samples[bi];
-  let dist = baseDist;
-  for (let tries = 0; tries < 40; tries++) {
-    const pos = new THREE.Vector3(s.p.x + s.side.x * edge * dist, s.p.y, s.p.z + s.side.z * edge * dist);
-    const info = ring.nearestSample(pos);
-    if (Math.abs(info.lateral) - halfExtent - ring.halfWidth > 7) return pos;
-    dist += 6;
-  }
-  return null;
-}
-
-function makeFreewayTree(seed, treeAsset) {
-  // cloneTint's name-based PAINT regex only matches car paint slots, not
-  // foliage materials, so re-tinting a tree needs the same color-heuristic
-  // approach the old sakura tree used (detect "greenish" materials by value)
-  // -- here shifting them to a dark violet silhouette instead of blossom pink,
-  // so trees read as shapes against the neon night sky rather than daylight
-  // roadside planting.
-  const t = cloneTint(treeAsset, null);
-  const hue = seed % 2 ? 0x1a1030 : 0x231640;
-  t.traverse(x => {
-    if (!x.isMesh) return;
-    for (const m of Array.isArray(x.material) ? x.material : [x.material]) {
-      if ('metalness' in m) m.metalness = Math.min(m.metalness, .1);
-      if (!m.color) continue;
-      const c = m.color;
-      if (c.g > c.r * .9 && c.g > c.b * .9) { m.color.set(hue); if ('roughness' in m) m.roughness = Math.max(m.roughness, .7); }
-    }
-  });
-  const scale = 2.0 + (seed % 5) * .4;
-  t.scale.setScalar(scale); t.rotation.y = (seed * 2.4) % 6.28;
-  return t;
-}
-
 function makeHill(radius, height, seed) {
   const cone = new THREE.Mesh(
     new THREE.ConeGeometry(radius, height, 7, 1),
@@ -246,44 +88,27 @@ function makeNeonCityBuilding(width, height, depth, seed) {
   return g;
 }
 
-// Freeway scenery: reuses the guardrail/post loop already built for every
-// theme by buildRoadSurface, adds sound-wall segments and sparse natural
-// trees (much sparser than the old sakura theme's density) plus a flat, wide,
-// low hill silhouette for the distant skyline instead of buildings/mountains/
-// grandstands. Overpass structures are explicitly skipped -- interchanges are
-// a later phase.
-export function buildScenery(theme, ring, groups, assets) {
+// Freeway scenery: the near-road guardrail/wall/tree scatter is now the
+// tile kit's own job (TileRoadBuilder.scatterProps, using its real prop
+// meshes) -- this keeps only the background: a flat, wide, low hill
+// silhouette plus a lit cyberpunk city skyline ringing the whole network at
+// a fixed distance beyond its bounds. Overpass structures are explicitly
+// skipped -- interchanges are a later phase.
+export function buildScenery(theme, network, groups, ground) {
   const { roadBuildings, skyline } = groups;
   roadBuildings.clear(); skyline.clear();
+  const pal = THEME_PALETTES[theme];
+  const { minX, maxX, minZ, maxZ } = network.bounds;
+  const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+  const maxExtent = Math.max(maxX - minX, maxZ - minZ) / 2;
+
+  ground.material.color.setHex(pal.ground);
+  const groundRadius = maxExtent + 600;
+  if (ground.geometry.parameters.radius !== groundRadius) { ground.geometry.dispose(); ground.geometry = new THREE.CircleGeometry(groundRadius, 96); }
+  ground.position.set(cx, ground.position.y, cz);
+
   if (theme !== 'us101') return;
-
-  const maxExtent = Math.max(...ring.points.map(p => Math.hypot(p.x, p.z)));
   const skylineRadius = maxExtent + 950;
-
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x241a3a, roughness: .8 });
-  const wallGeo = new THREE.BoxGeometry(8, 4, .3);
-  const wallCount = Math.max(40, Math.round(ring.length / 26));
-  for (let i = 0; i < wallCount; i++) {
-    const u = i / wallCount, edge = i % 2 ? 1 : -1;
-    const pos = placeClearOfRoad(ring, u, edge, 10, 4);
-    if (!pos) continue;
-    const wall = new THREE.Mesh(wallGeo, wallMat);
-    wall.position.copy(pos); wall.position.y += 2;
-    const s = ring.samples[Math.round((u % 1 + 1) % 1 * ring.sampleCount)];
-    wall.rotation.y = Math.atan2(s.t.x, s.t.z);
-    wall.castShadow = true; wall.receiveShadow = true;
-    roadBuildings.add(wall);
-  }
-
-  const treeCount = Math.max(20, Math.round(ring.length / 70)); // much sparser than sakura's trackLength/22
-  for (let i = 0; i < treeCount; i++) {
-    const u = i / treeCount + .002 * Math.sin(i * 11), edge = i % 2 ? 1 : -1, halfExtent = 4;
-    const pos = placeClearOfRoad(ring, u, edge, 16 + (i * 13 % 26), halfExtent);
-    if (!pos) continue;
-    const t = makeFreewayTree(i, assets.treeAsset);
-    t.position.copy(pos);
-    roadBuildings.add(t);
-  }
 
   // Lit cyberpunk city skyline, near ring -- this is the primary background
   // element per the requested vibe, not an afterthought.
@@ -293,7 +118,7 @@ export function buildScenery(theme, ring, groups, assets) {
     const radius = skylineRadius + (i * 29 % 90);
     const width = 16 + (i * 13 % 24), depth = 16 + (i * 7 % 20), height = 55 + (i * 41 % 170);
     const b = makeNeonCityBuilding(width, height, depth, i);
-    b.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
+    b.position.set(cx + Math.cos(a) * radius, 0, cz + Math.sin(a) * radius);
     b.rotation.y = i;
     skyline.add(b);
   }
@@ -303,7 +128,7 @@ export function buildScenery(theme, ring, groups, assets) {
     const a = i / hillCount * Math.PI * 2 + (i * .37 % 1) * .08;
     const radius = skylineRadius + 700 + (i * 41 % 300);
     const hill = makeHill(280 + (i * 53 % 260), 110 + (i * 37 % 170), i);
-    hill.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
+    hill.position.set(cx + Math.cos(a) * radius, 0, cz + Math.sin(a) * radius);
     skyline.add(hill);
   }
 }

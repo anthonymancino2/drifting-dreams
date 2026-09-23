@@ -5,9 +5,16 @@ import { mphToMs } from '../vehicles/VehicleRegistry.js';
 // system, not just a penalty meter: checkpoints spaced around the ring award
 // a bonus when reached within a time budget, offsetting the -1/+1 collision
 // penalty so score isn't purely punitive.
+// `playerArc` throughout is player.primaryArc (PlayerVehicle's projection
+// of wherever it actually is in the graph onto primary-loop progress) --
+// checkpoints only ever live on the primary loop (network.primaryEdges), so
+// route choice through the diamond changes time-to-next-checkpoint but
+// never checkpoint validity or sequencing, exactly as planned: both
+// branches reconverge before the next checkpoint, so this stays a plain
+// ordered cycle with no pathfinding needed.
 export class RaceManager {
-  constructor(ring, config) {
-    this.ring = ring;
+  constructor(network, config) {
+    this.network = network;
     this.cfg = config;
     this.checkpoints = this._buildCheckpoints();
     this.score = 0;
@@ -19,10 +26,11 @@ export class RaceManager {
 
   _buildCheckpoints() {
     const { checkpointCount, targetPaceMph, checkpointGraceSec } = this.cfg.race;
-    const segmentLen = this.ring.length / checkpointCount;
+    const totalLen = this.network.totalPrimaryLength;
+    const segmentLen = totalLen / checkpointCount;
     const budgetSec = segmentLen / mphToMs(targetPaceMph) + checkpointGraceSec;
     return Array.from({ length: checkpointCount }, (_, i) => ({
-      arc: (i / checkpointCount) * this.ring.length,
+      arc: (i / checkpointCount) * totalLen,
       budgetSec,
       cleared: false
     }));
@@ -40,8 +48,8 @@ export class RaceManager {
     // Crossed once the player's arc has advanced to (or past) the checkpoint's
     // arc, measured the short way around the wrap -- mirrors the wrap-aware
     // forward-progress technique updateLapProgress used (index.html:313).
-    const distanceToGo = this.ring.wrapArc(cp.arc - playerArc);
-    const segmentLen = this.ring.length / this.checkpoints.length;
+    const distanceToGo = this.network.wrapPrimaryArc(cp.arc - playerArc);
+    const segmentLen = this.network.totalPrimaryLength / this.checkpoints.length;
     if (!cp.cleared && distanceToGo < segmentLen * .02) {
       cp.cleared = true;
       if (this._segmentTimer <= cp.budgetSec) {

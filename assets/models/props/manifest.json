@@ -1,0 +1,24 @@
+{
+  "trees": {
+    "Tree3": "assets/models/props/Tree3.glb",
+    "Tree4": "assets/models/props/Tree4.glb",
+    "tree_1_a": "assets/models/props/tree_1_a.glb",
+    "bush_1": "assets/models/props/bush_1.glb"
+  },
+  "lamps": {
+    "lamp_1": "assets/models/props/lamp_1.glb",
+    "lamp_2": "assets/models/props/lamp_2.glb"
+  },
+  "barriers": {
+    "road_barier_2a": "assets/models/props/road_barier_2a.glb",
+    "road_barier_2b": "assets/models/props/road_barier_2b.glb",
+    "road_barrier_1": "assets/models/props/road_barrier_1.glb"
+  },
+  "traffic": {
+    "hazzard_cone_1": "assets/models/props/hazzard_cone_1.glb",
+    "traffic_barell_1": "assets/models/props/traffic_barell_1.glb",
+    "traffic_light_1": "assets/models/props/traffic_light_1.glb",
+    "traffic_light_2": "assets/models/props/traffic_light_2.glb",
+    "traffic_light_3": "assets/models/props/traffic_light_3.glb"
+  }
+}

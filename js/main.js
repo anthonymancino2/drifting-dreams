@@ -9,8 +9,13 @@ import { loadCarAssets } from './vehicles/AssetLoader.js';
 import { VEHICLES } from './vehicles/VehicleRegistry.js';
 import { getCarThumbnail } from './vehicles/CarThumbnail.js';
 import { triggerHitFlash } from './vehicles/CarVisual.js';
-import { FreewayRing } from './road/FreewayRing.js';
-import { applyEnvironment, buildRoadSurface, buildScenery, makeSkyTexture, THEME_PALETTES } from './road/roadThemes.js';
+import { RoadNetwork } from './road/RoadNetwork.js';
+import { ROAD_LAYOUT } from './road/RoadLayout.js';
+import { TILE_CATALOG } from './road/TileCatalog.js';
+import { loadRoadTileAssets, loadPropAssets } from './road/TileAssetLoader.js';
+import { buildTileRoad, scatterProps } from './road/TileRoadBuilder.js';
+import { applyEnvironment, buildScenery, makeSkyTexture, THEME_PALETTES } from './road/roadThemes.js';
+import { mulberry32 } from './core/MathUtils.js';
 import { PlayerVehicle } from './player/PlayerVehicle.js';
 import { TrafficManager } from './traffic/TrafficManager.js';
 import { OpposingTraffic } from './traffic/OpposingTraffic.js';
@@ -115,7 +120,7 @@ let mode = 'attract';
 let raceTime = 0, countdown = 3.7, paused = false;
 let slowMoTimer = 0;
 let vehiclePickIndex = 0;
-let player, trafficManager, opposingTraffic, ring, cameraManager, raceManager, hud, carAssets, driftEffects;
+let player, trafficManager, opposingTraffic, network, cameraManager, raceManager, hud, carAssets, driftEffects;
 const SHOWCASE_POS = new THREE.Vector3(0, -4.3, 0);
 
 function showScreen(id) {
@@ -129,26 +134,29 @@ function showScreen(id) {
 }
 
 async function boot() {
-  const assets = await loadCarAssets();
+  const [assets, roadTileAssets, propAssets] = await Promise.all([
+    loadCarAssets(), loadRoadTileAssets(), loadPropAssets()
+  ]);
   carAssets = assets.carAssets;
 
-  ring = new FreewayRing(GAME_CONFIG.road).build();
+  network = new RoadNetwork(GAME_CONFIG.road).build(ROAD_LAYOUT, TILE_CATALOG);
   applyEnvironment('us101', { scene, hemi, ambient, sun, sunBall, retroDecor });
-  buildRoadSurface('us101', ring, roadGroup, scene, ground);
-  buildScenery('us101', ring, { roadBuildings, skyline }, assets);
+  buildScenery('us101', network, { roadBuildings, skyline }, ground);
+  buildTileRoad(network, TILE_CATALOG, roadTileAssets, roadGroup);
+  scatterProps(network, propAssets, roadGroup, mulberry32(GAME_CONFIG.traffic.seed ^ 0x5eed));
 
   player = new PlayerVehicle(scene, carAssets, VEHICLES[vehiclePickIndex].assetIndex);
   player.position.copy(SHOWCASE_POS);
 
-  trafficManager = new TrafficManager(scene, ring, GAME_CONFIG, carAssets);
+  trafficManager = new TrafficManager(scene, network, GAME_CONFIG, carAssets);
   trafficManager.spawnInitial(0);
-  opposingTraffic = new OpposingTraffic(scene, ring, GAME_CONFIG.road, carAssets);
+  opposingTraffic = new OpposingTraffic(scene, network, GAME_CONFIG.road, carAssets);
   opposingTraffic.spawnInitial(0);
 
   cameraManager = new CameraManager(camera, GAME_CONFIG);
-  raceManager = new RaceManager(ring, GAME_CONFIG);
+  raceManager = new RaceManager(network, GAME_CONFIG);
   hud = new HUD($);
-  hud.buildMinimap(ring, raceManager.checkpoints);
+  hud.buildMinimap(network, raceManager.checkpoints);
   driftEffects = { smoke: new SmokeSystem(scene), skid: new SkidMarkSystem(scene) };
 
   setupInput();
@@ -189,16 +197,18 @@ function confirmVehicle() { resetRace(); }
 
 function resetRace() {
   raceTime = 0; countdown = 3.7; paused = false;
-  player.position.copy(ring.pointAtArc(0, ring.laneCenterOffset(Math.floor(GAME_CONFIG.road.laneCount / 2))));
-  const fr = ring.frame(0);
+  const startEdge = network.primaryEdges[0];
+  player.edgeId = startEdge.id;
+  player.position.copy(startEdge.pointAtArc(0, startEdge.laneCenterOffset(Math.floor(GAME_CONFIG.road.laneCount / 2))));
+  const fr = startEdge.frame(0);
   player.heading = Math.atan2(fr.t.x, fr.t.z); player.moveHeading = player.heading;
   player.speed = 0; player.steer = 0; player.yawRate = 0; player.nitro = 1;
-  player._sampleHint = null; player._shoulderRecoverTimer = 0;
+  player._sampleHint = null; player._shoulderRecoverTimer = 0; player.arc = 0; player.primaryArc = 0;
 
   trafficManager.spawnInitial(0);
   opposingTraffic.spawnInitial(0);
-  raceManager = new RaceManager(ring, GAME_CONFIG);
-  hud.buildMinimap(ring, raceManager.checkpoints);
+  raceManager = new RaceManager(network, GAME_CONFIG);
+  hud.buildMinimap(network, raceManager.checkpoints);
   cameraManager.mode = 0;
 
   mode = 'countdown'; input.setMode(mode);
@@ -271,6 +281,16 @@ function updateShowcase(dt) {
   camera.fov = THREE.MathUtils.lerp(camera.fov, 50, dt * 3); camera.updateProjectionMatrix();
 }
 
+// --- Junction sign (RoadLayout's one split: left lanes -> shortcut, right
+// lanes -> bypass -- see RoadLayout.js's own branch-order comment) ---------
+function nextJunctionSignText() {
+  if (!player.edgeId) return null;
+  const edge = network.getEdge(player.edgeId);
+  if (edge.nextEdges.length <= 1) return null;
+  if (edge.length - player.arc > GAME_CONFIG.road.network.signDistance) return null;
+  return 'AHEAD: KEEP LEFT → SHORTCUT (heavier) / KEEP RIGHT → BYPASS (lighter, longer)';
+}
+
 // --- Main loop -----------------------------------------------------------
 function tick() {
   requestAnimationFrame(tick);
@@ -290,8 +310,8 @@ function tick() {
     $('banner').textContent = n > 0 ? n : 'GO!';
     $('banner').classList.add('show');
     if (countdown <= 0) { mode = 'race'; input.setMode(mode); setTimeout(() => { if (!paused) $('banner').classList.remove('show'); }, 650); }
-    trafficManager.update(dt, player.arc, raceTime);
-    opposingTraffic.update(dt, player.arc, raceTime);
+    trafficManager.update(dt, player.primaryArc, raceTime);
+    opposingTraffic.update(dt, player.primaryArc, raceTime);
     cameraManager.update(dt, player);
     player.placeVisual(dt, raceTime);
     hud.update({
@@ -311,10 +331,10 @@ function tick() {
     const gdt = slowMoTimer > 0 ? dt * GAME_CONFIG.collision.closeCall.slowMoScale : dt;
 
     raceTime += gdt;
-    player.update(gdt, input.input, ring, GAME_CONFIG, driftEffects);
-    trafficManager.update(gdt, player.arc, raceTime);
-    opposingTraffic.update(gdt, player.arc, raceTime);
-    checkPlayerTrafficCollisions(player, trafficManager, ring, GAME_CONFIG,
+    player.update(gdt, input.input, network, GAME_CONFIG, driftEffects);
+    trafficManager.update(gdt, player.primaryArc, raceTime);
+    opposingTraffic.update(gdt, player.primaryArc, raceTime);
+    checkPlayerTrafficCollisions(player, trafficManager, network, GAME_CONFIG,
       (car) => { raceManager.registerTrafficHit(); triggerHitFlash(car); },
       () => {
         raceManager.registerCloseCall();
@@ -322,7 +342,7 @@ function tick() {
         slowMoTimer = GAME_CONFIG.collision.closeCall.slowMoDurationSec;
       }
     );
-    raceManager.update(gdt, player.arc);
+    raceManager.update(gdt, player.primaryArc);
     const speedAbs = cameraManager.update(gdt, player);
     updateSpeedFx(speedAbs);
     driftEffects.smoke.update(gdt);
@@ -337,7 +357,8 @@ function tick() {
       checkpointEvent: events.checkpoint,
       closeCall: events.closeCall,
       trafficCars: trafficManager.activeCars,
-      boosting: input.input.nitro && player.nitro > 0
+      boosting: input.input.nitro && player.nitro > 0,
+      nextJunctionText: nextJunctionSignText()
     });
   }
 

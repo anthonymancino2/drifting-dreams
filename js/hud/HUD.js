@@ -33,19 +33,28 @@ export class HUD {
   }
 
   // Precomputes the minimap's lane-boundary polylines and checkpoint tick
-  // positions once per world build (ring never changes mid-race in phase 1).
-  buildMinimap(ring, checkpoints, sampleCount = 130) {
-    const boundaryCount = ring.cfg.laneCount + 1;
-    this._laneLines = Array.from({ length: boundaryCount }, (_, b) => {
-      const offset = -((ring.cfg.laneCount * ring.cfg.laneWidth) / 2) + b * ring.cfg.laneWidth;
-      return Array.from({ length: sampleCount }, (_, i) => ring.pointAtArc((i / sampleCount) * ring.length, offset).clone());
-    });
-    this._checkpointPts = checkpoints.map(cp => ring.pointAtArc(cp.arc, 0).clone());
-    const outer = [...this._laneLines[0], ...this._laneLines[boundaryCount - 1]];
-    this._bounds = {
-      minX: Math.min(...outer.map(p => p.x)), maxX: Math.max(...outer.map(p => p.x)),
-      minZ: Math.min(...outer.map(p => p.z)), maxZ: Math.max(...outer.map(p => p.z))
-    };
+  // positions once per world build (the network never changes mid-race).
+  // Draws every edge in the graph (not just the primary loop), so the
+  // diamond's shortcut/bypass show up on the map same as the main oval.
+  buildMinimap(network, checkpoints, samplesPerEdge = 40) {
+    const boundaryCount = network.cfg.laneCount + 1;
+    const edges = [...network.edges.values()];
+    // One polyline per (edge, lane boundary) pair -- edges aren't
+    // continuous with each other visually the way the old single ring was,
+    // so each edge draws its own short boundary segments rather than one
+    // network-spanning line per boundary index.
+    this._laneLines = [];
+    for (const edge of edges) {
+      for (let b = 0; b < boundaryCount; b++) {
+        const isEdgeBoundary = b === 0 || b === boundaryCount - 1;
+        const offset = -((network.cfg.laneCount * network.cfg.laneWidth) / 2) + b * network.cfg.laneWidth;
+        const pts = Array.from({ length: samplesPerEdge }, (_, i) => edge.pointAtArc((i / (samplesPerEdge - 1)) * edge.length, offset));
+        this._laneLines.push({ pts, isEdgeBoundary });
+      }
+    }
+    this._checkpointPts = checkpoints.map(cp => network.primaryPointAtArc(cp.arc, 0));
+    const { minX, maxX, minZ, maxZ } = network.bounds;
+    this._bounds = { minX, maxX, minZ, maxZ };
   }
 
   _drawSpeedGauge(mph, boosting) {
@@ -86,13 +95,12 @@ export class HUD {
     ctx.clearRect(0, 0, w, h);
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
 
-    this._laneLines.forEach((line, i) => {
-      const isEdge = i === 0 || i === this._laneLines.length - 1;
-      ctx.strokeStyle = isEdge ? 'rgba(210,240,242,.9)' : 'rgba(210,240,242,.35)';
-      ctx.lineWidth = isEdge ? 5 : 1.5;
+    this._laneLines.forEach(({ pts, isEdgeBoundary }) => {
+      ctx.strokeStyle = isEdgeBoundary ? 'rgba(210,240,242,.9)' : 'rgba(210,240,242,.35)';
+      ctx.lineWidth = isEdgeBoundary ? 5 : 1.5;
       ctx.beginPath();
-      line.forEach((p, j) => { const [x, y] = xy(p); j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
-      ctx.closePath(); ctx.stroke();
+      pts.forEach((p, j) => { const [x, y] = xy(p); j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      ctx.stroke();
     });
 
     ctx.fillStyle = '#ffd31d';
@@ -117,6 +125,10 @@ export class HUD {
     $('speedLimit').textContent = Math.round(state.speedLimitMph);
     $('nitroFill').style.height = (state.player.nitro * 94) + '%';
     $('checkpointTime').textContent = state.checkpointSecRemaining.toFixed(1) + 's';
+
+    const junctionPill = $('nextJunctionPill');
+    if (state.nextJunctionText) { junctionPill.textContent = state.nextJunctionText; junctionPill.hidden = false; }
+    else junctionPill.hidden = true;
 
     if (state.checkpointEvent) {
       const scoreEl = $('score');

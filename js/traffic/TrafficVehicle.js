@@ -27,7 +27,16 @@ export class TrafficVehicle {
     this.targetLaneIndex = 0;
     this.laneBlendT = 1;
 
+    this.edgeId = null;
     this.arc = 0;
+    this.primaryArc = 0;
+    // Set once, the first time the car comes within road.network.decisionWindow
+    // of a split, by rolling road.network.branchWeights -- committing early
+    // (rather than at the exact node) is what lets _leaderAndFollowerInLane
+    // treat a car's chosen-but-not-yet-entered next edge as a real
+    // continuation, avoiding the "leader already switched edges, follower
+    // thinks the lane is empty" pop the plan called out.
+    this._committedNextEdgeId = null;
     this._sampleHint = null;
     this._laneChangeCooldown = 0;
     this._hitCooldown = 0;
