@@ -56,25 +56,43 @@ export class RoadEdge {
   // of wrapped. Returns an extra `offEnd`/`offStart` flag when the walk hit
   // an edge boundary (the node-transition signal), which the old closed-loop
   // version never needed since it always wrapped instead of ending.
+  _fullScan(pos) {
+    const SAMPLES = this.samples, N = this.sampleCount;
+    let best = Infinity, bi = 0;
+    for (let i = 0; i <= N; i++) { const d = (SAMPLES[i].p.x - pos.x) ** 2 + (SAMPLES[i].p.z - pos.z) ** 2; if (d < best) { best = d; bi = i; } }
+    return bi;
+  }
+
   nearestSample(pos, hint) {
     const SAMPLES = this.samples, N = this.sampleCount;
     let bi;
     let offStart = false, offEnd = false;
     if (hint == null) {
-      let best = 1e9; bi = 0;
-      for (let i = 0; i <= N; i++) { const d = (SAMPLES[i].p.x - pos.x) ** 2 + (SAMPLES[i].p.z - pos.z) ** 2; if (d < best) { best = d; bi = i; } }
+      bi = this._fullScan(pos);
     } else {
       bi = clamp(hint, 0, N);
+      let converged = false;
       for (let iter = 0; iter < 8; iter++) {
         const s = SAMPLES[bi];
-        if (bi >= N) { offEnd = true; break; }
+        if (bi >= N) { offEnd = true; converged = true; break; }
         const ns = SAMPLES[bi + 1];
         const along = (pos.x - s.p.x) * s.t.x + (pos.z - s.p.z) * s.t.z;
         const segLen = Math.max(.0001, Math.hypot(ns.p.x - s.p.x, ns.p.z - s.p.z));
-        if (along < 0) { if (bi === 0) { offStart = true; break; } bi -= 1; continue; }
+        if (along < 0) { if (bi === 0) { offStart = true; converged = true; break; } bi -= 1; continue; }
         if (along > segLen) { bi += 1; continue; }
-        break;
+        converged = true; break;
       }
+      // The 8-step local walk assumes the car only moved a short distance
+      // since the last hint -- true almost always, but a hard spinout or
+      // collision knockback can occasionally move it further than that in
+      // one frame, especially near a chicane where the path curves back
+      // close to itself (the walk can "run out of steps" without ever
+      // reaching the true nearest segment). Rather than silently keeping
+      // whatever wrong-but-nearby-looking segment the walk stalled on --
+      // which under-reports how far off the road the car actually is, the
+      // exact way a shoulder clamp could fail to catch a real escape --
+      // fall back to a full scan for the true nearest sample.
+      if (!converged) { bi = this._fullScan(pos); offStart = offEnd = false; }
     }
     bi = clamp(bi, 0, N);
     const s = SAMPLES[bi];

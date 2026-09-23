@@ -110,6 +110,14 @@ export class InputManager {
       }
       const action = this.keyToAction(e.code);
       if (action && HELD_ACTIONS.includes(action)) { this.keyHeld[action] = true; e.preventDefault(); }
+      // e.repeat is true for the synthetic keydown events the OS fires while
+      // a key is held (not a second real press) -- HELD_ACTIONS don't care
+      // (keyHeld=true is idempotent either way), but camera-cycle and
+      // pause are single-press TOGGLES: without this guard, holding Escape
+      // even slightly too long fires several toggles from one press, which
+      // is exactly how pause gets stuck -- an odd/even number of repeats
+      // lands back on paused instead of the single toggle the player did.
+      if (e.repeat) return;
       if (action === 'camera') this.handlers.onCameraCycle?.();
       if (action === 'pause') this.handlers.onPause?.();
     });
