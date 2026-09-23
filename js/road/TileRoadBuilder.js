@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TILE_SCALE } from './TileCatalog.js';
+import { TILE_SCALE, SURFACE_Y } from './TileCatalog.js';
 import { THEME_PALETTES } from './roadThemes.js';
 
 // Places a plain clone (road tiles carry no paint-slot materials, so no
@@ -24,7 +24,13 @@ export function buildTileRoad(network, catalog, tileAssets, roadGroup) {
       // the mirrored tile visible regardless of which way winding ended up.
       mesh.traverse(o => { if (o.isMesh) for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.side = THREE.DoubleSide; });
     }
-    mesh.position.set(anchor[0], 0, anchor[1]);
+    // The tiles are NOT modeled flush with their own local Y=0 -- the actual
+    // drivable surface sits at local Y=SURFACE_Y (measured empirically, see
+    // TileCatalog.js) -- so every tile is re-anchored down by that amount
+    // (scaled) to land the surface exactly at world Y=0, matching every
+    // sample/player/traffic Y position already written assuming that.
+    // Without this, cars rendered at Y=0 sat visibly embedded in the tile.
+    mesh.position.set(anchor[0], -SURFACE_Y * TILE_SCALE, anchor[1]);
     mesh.rotation.y = deg * Math.PI / 180;
     roadGroup.add(mesh);
     placed++;

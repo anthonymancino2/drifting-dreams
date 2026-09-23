@@ -24,6 +24,20 @@
 // bigger-radius, which also makes them easier to hold a drift through at
 // speed instead of demanding a near-stop for a tight radius-18 turn).
 export const TILE_SCALE = 2;
+
+// Measured empirically (raycasting the actual .glb geometry, not a guess):
+// every tile in this family (straight/curve/splitter all checked) is flat
+// at local Y=0.2 across its drivable lanes (local X roughly [-4.5, 4.5]),
+// with a real curb bump peaking at local X=+-5 (Y=0.475) before tapering
+// off toward the tile's absolute edge at X=+-6. Two things follow from this:
+// (1) TileRoadBuilder re-anchors each placed mesh down by SURFACE_Y*TILE_SCALE
+// so the drivable surface lands exactly at world Y=0, matching every sample/
+// player/traffic Y already written assuming that; (2) the game's own
+// road-edge math (config.js road.laneWidth/shoulderWidth) is set so
+// roadHalfWidth lands exactly on this curb (5*TILE_SCALE), not on some
+// invented shoulder distance floating past it in open ground.
+export const SURFACE_Y = 0.2;
+export const CURB_LOCAL_X = 5;
 export const CELL_SIZE = 12 * TILE_SCALE;
 
 export const TILE_CATALOG = {

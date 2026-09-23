@@ -3,8 +3,14 @@
 export const GAME_CONFIG = {
   road: {
     laneCount: 4,
-    laneWidth: 6.0,             // exact fit for the modular kit's tile at TileCatalog's TILE_SCALE=2 (4 * 6.0 = 24.0, flush with the tile edge)
-    shoulderWidth: 6,
+    // Measured from the actual tile geometry (TileCatalog.js's CURB_LOCAL_X),
+    // not guessed: the real curb bump sits at local X=5, so roadHalfWidth
+    // (laneCount*laneWidth/2) must equal 5*TILE_SCALE=10 for the game's own
+    // "edge of the road" to land exactly on the visible curb instead of
+    // floating past it in open ground -- laneCount(4) * laneWidth/2 = 10.
+    laneWidth: 5.0,
+    // No invented extra margin past the curb -- the curb IS the boundary.
+    shoulderWidth: 0,
     sampleGap: 5.4,
     speedLimitMph: 65,
     // Tuning for the branching tile network (RoadNetwork/RoadNode) -- see
